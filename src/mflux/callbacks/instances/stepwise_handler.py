@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import glob
+import time  # Add time module for timestamp
 
 import mlx.core as mx
 import PIL.Image
@@ -26,6 +27,10 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         self.single_latest_image = None  # Store the latest image for single image mode
         self.composite_saved = False
         self.single_image_path = None
+        
+        # Generate a unique timestamp for this run
+        self.timestamp = int(time.time())
+        print(f"StepwiseHandler initialized with timestamp: {self.timestamp}")
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -112,9 +117,16 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
                 composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
                 self.composite_saved = True
                 
-                # Remove the in-progress file since we're done
-                if self.single_image_path and self.single_image_path.exists():
-                    os.unlink(self.single_image_path)
+                # Remove all progress files since we're done
+                print(f"Cleaning up progress files...")
+                try:
+                    # Clean up all progress files with this timestamp
+                    pattern = str(self.output_dir / f"progress_{self.timestamp}_*.png")
+                    for file_path in glob.glob(pattern):
+                        print(f"Removing {file_path}")
+                        os.unlink(file_path)
+                except Exception as e:
+                    print(f"Warning: Error cleaning up progress files: {e}")
         else:
             # Original behavior for multi-file mode
             self._save_composite(seed=seed)
@@ -146,10 +158,11 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
             # In single image mode, just store the latest image and save it
             self.single_latest_image = stepwise_img
             
-            # Use a single, unique filename that won't get versioned
-            self.single_image_path = self.output_dir / f"current_progress.png"
+            # Use a unique timestamped filename that won't trigger versioning
+            self.single_image_path = self.output_dir / f"progress_{self.timestamp}_{step}.png"
+            print(f"Saving step {step} to {self.single_image_path}")
             
-            # Only maintain a single file - overwrite it each time
+            # Only maintain a single file for each step
             stepwise_img.save(
                 path=self.single_image_path,
                 export_json_metadata=False,
