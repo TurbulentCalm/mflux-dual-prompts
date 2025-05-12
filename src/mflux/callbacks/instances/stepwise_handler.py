@@ -22,6 +22,8 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         self.output_dir = Path(output_dir)
         self.step_wise_images = []
         self.single_image = single_image
+        self.single_latest_image = None  # Store the latest image for single image mode
+        self.composite_saved = False
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +73,16 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         config: RuntimeConfig,
         time_steps: tqdm,
     ) -> None:
-        self._save_composite(seed=seed)
+        if self.single_image:
+            # For single image mode, create composite at the end if it hasn't been created yet
+            if not self.composite_saved and self.single_latest_image is not None:
+                # Create a new composite image from the single latest image instead of trying to copy
+                composite_img = ImageUtil.to_composite_image([self.single_latest_image])
+                composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
+                self.composite_saved = True
+        else:
+            # Original behavior for multi-file mode
+            self._save_composite(seed=seed)
 
     def _save_image(
         self,
@@ -97,18 +108,12 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         )
         
         if self.single_image:
-            # Save/overwrite to a consistent filename when in single image mode
-            single_image_path = self.output_dir / f"seed_{seed}_latest.png"
+            # In single image mode, just store the latest image and save it
+            self.single_latest_image = stepwise_img
             
-            # Remove any existing numbered files that might have been created
-            for old_file in self.output_dir.glob(f"seed_{seed}_current_step*.png"):
-                try:
-                    os.unlink(old_file)
-                except OSError:
-                    pass
-                    
+            # Only maintain a single file - overwrite it each time
             stepwise_img.save(
-                path=single_image_path,
+                path=self.output_dir / f"seed_{seed}_latest.png",
                 export_json_metadata=False,
             )
         else:
@@ -117,9 +122,9 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
                 path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
                 export_json_metadata=False,
             )
-            
-        self.step_wise_images.append(stepwise_img)
-        self._save_composite(seed=seed)
+            # Only append to step_wise_images in multi-file mode
+            self.step_wise_images.append(stepwise_img)
+            self._save_composite(seed=seed)
 
     def _save_composite(self, seed: int) -> None:
         if self.step_wise_images:
