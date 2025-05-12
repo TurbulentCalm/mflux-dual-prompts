@@ -17,7 +17,24 @@ def float_type(arg):
     Useful for making CLI arguments more tolerant of trailing spaces."""
     if isinstance(arg, str):
         arg = arg.strip()
+        if not arg:  # Skip empty strings
+            return None
     return float(arg)
+
+
+class LoraScalesAction(argparse.Action):
+    """Custom action for lora-scales to filter out None/empty values"""
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Filter out None values (which come from empty strings)
+        if values is None:
+            setattr(namespace, self.dest, None)
+            return
+        
+        filtered_values = [v for v in values if v is not None]
+        if not filtered_values:
+            setattr(namespace, self.dest, None)  # If all values were filtered out, use None
+        else:
+            setattr(namespace, self.dest, filtered_values)
 
 
 class ModelSpecAction(argparse.Action):
@@ -67,7 +84,7 @@ class CommandLineParser(argparse.ArgumentParser):
         lora_group = self.add_argument_group("LoRA configuration")
         lora_group.add_argument("--lora-style", type=str, choices=sorted(LORA_NAME_MAP.keys()), help="Style of the LoRA to use (e.g., 'storyboard' for film storyboard style)")
         self.add_argument("--lora-paths", type=str, nargs="*", default=None, help="Local safetensors for applying LORA from disk")
-        self.add_argument("--lora-scales", type=float_type, nargs="*", default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
+        self.add_argument("--lora-scales", type=float_type, nargs="*", action=LoraScalesAction, default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
         lora_group.add_argument("--lora-name", type=str, help="Name of the LoRA to download from Hugging Face")
         lora_group.add_argument("--lora-repo-id", type=str, default=LORA_REPO_ID, help=f"Hugging Face repository ID for LoRAs (default: {LORA_REPO_ID})")
 
