@@ -14,6 +14,7 @@ Run the powerful [FLUX](https://blackforestlabs.ai/#get-flux) models from [Black
 - [💿 Installation](#-installation)
 - [🖼️ Generating an image](#%EF%B8%8F-generating-an-image)
   * [📜 Full list of Command-Line Arguments](#-full-list-of-command-line-arguments)
+  * [📜 Dual Prompts: CLIP_L and T5 Command-Line Arguments](#-dual-prompts-clip_l-and-t5-command-line-arguments)
 - [⏱️ Image generation speed (updated)](#%EF%B8%8F-image-generation-speed-updated)
 - [↔️ Equivalent to Diffusers implementation](#%EF%B8%8F-equivalent-to-diffusers-implementation)
 - [🗜️ Quantization](#%EF%B8%8F-quantization)
@@ -204,6 +205,35 @@ mflux-generate --model dev --prompt "Luxury food photograph" --steps 25 --seed 2
 - **`--lora-repo-id`** (optional, `str`, default: `"ali-vilab/In-Context-LoRA"`): The Hugging Face repository ID for LoRAs.
 
 - **`--stepwise-image-output-dir`** (optional, `str`, default: `None`): [EXPERIMENTAL] Output directory to write step-wise images and their final composite image to. This feature may change in future versions. When specified, MFLUX will save an image for each denoising step, allowing you to visualize the generation process from noise to final image.
+
+#### 📜 Dual Prompts: CLIP_L and T5 Command-Line Arguments
+
+MFLUX now supports **dual prompts** for advanced users who want to control the CLIP_L and T5 text encoders separately. This allows you to bypass the 77-token limit of CLIP and experiment with prompt influence on image generation.
+
+**New arguments:**
+- `--dual-prompts` (flag): Enables dual prompt mode. When set, you must provide both `--clip_l-prompt` and `--t5-prompt`.
+- `--clip_l-prompt` (str): The prompt string for the CLIP_L encoder. Can be an empty string if you only want to use T5.
+- `--t5-prompt` (str): The prompt string for the T5 encoder. Can be an empty string if you only want to use CLIP_L.
+
+**Usage notes:**
+- If `--dual-prompts` is not set, the standard `--prompt` argument is used for both encoders.
+- If `--dual-prompts` is set, both `--clip_l-prompt` and `--t5-prompt` must be provided (empty strings are allowed).
+- The T5 prompt generally has a stronger influence on the generated image than the CLIP_L prompt.
+- You can experiment by leaving one prompt empty to see the effect of each encoder.
+
+**Example:**
+```sh
+mflux-generate \
+  --dual-prompts \
+  --clip_l-prompt "A large yellow bird" \
+  --t5-prompt "" \
+  --model schnell \
+  --steps 4 \
+  --seed 2 \
+  --output output.png
+```
+
+This will use only the CLIP_L encoder for guidance. To use only T5, swap the prompts.
 
 #### 📜 In-Context LoRA Command-Line Arguments
 
@@ -1209,3 +1239,14 @@ MFLUX would not be possible without the great work of:
 ### ⚖️ License
 
 This project is licensed under the [MIT License](LICENSE).
+
+### Best Practices for Contributions
+
+If you plan to contribute to this project (or submit a pull request):
+- **Code style:** Follow the existing code style and structure. Use type annotations and docstrings where appropriate.
+- **Linting:** Run `make lint` and `make format` before submitting. Fix all errors and warnings unless discussed.
+- **Testing:** Add or update tests for new features or bugfixes. Run `make test` to ensure nothing is broken.
+- **Pull Requests:** Keep PRs focused and well-described. Reference related issues if applicable. Be ready to discuss/iterate on feedback.
+- **Documentation:** Update the README or docstrings for any user-facing changes or new features.
+
+Thank you for helping improve MFLUX!
