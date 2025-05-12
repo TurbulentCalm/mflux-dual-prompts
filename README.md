@@ -206,6 +206,20 @@ mflux-generate --model dev --prompt "Luxury food photograph" --steps 25 --seed 2
 
 - **`--stepwise-image-output-dir`** (optional, `str`, default: `None`): [EXPERIMENTAL] Output directory to write step-wise images and their final composite image to. This feature may change in future versions. When specified, MFLUX will save an image for each denoising step, allowing you to visualize the generation process from noise to final image.
 
+- **`--stepwise-single-image`** (optional, action='store_true'): [EXPERIMENTAL] When used with `--stepwise-image-output-dir`, creates a single image file that is updated at each step instead of separate files for each step. This allows you to monitor a single file to see the progression of the image generation, which is useful for real-time visualization and when you don't need to preserve intermediate steps.
+
+  **Example with default behavior (multiple files):**
+  ```sh
+  mflux-generate --prompt "A sunset over mountains" --model schnell --steps 4 --stepwise-image-output-dir "./steps"
+  ```
+  This will create files like: `seed_1234_step1of4.png`, `seed_1234_step2of4.png`, etc.
+
+  **Example with single image mode:**
+  ```sh
+  mflux-generate --prompt "A sunset over mountains" --model schnell --steps 4 --stepwise-image-output-dir "./steps" --stepwise-single-image
+  ```
+  This will create and continuously update a single file: `seed_1234_current_step.png` (plus the composite image).
+
 #### 📜 Dual Prompts: CLIP_L and T5 Command-Line Arguments
 
 MFLUX now supports **dual prompts** for advanced users who want to control the CLIP_L and T5 text encoders separately. This allows you to bypass the 77-token limit of CLIP and experiment with prompt influence on image generation.
