@@ -1,4 +1,4 @@
-from mflux import Config, StopImageGenerationException
+from mflux import Config, ModelConfig, StopImageGenerationException
 from mflux.callbacks.callback_registry import CallbackRegistry
 from mflux.callbacks.instances.memory_saver import MemorySaver
 from mflux.callbacks.instances.stepwise_handler import StepwiseHandler
@@ -11,9 +11,9 @@ def main():
     parser = CommandLineParser(description="Generate an image using the fill tool to complete masked areas.")
     parser.add_general_arguments()
     parser.add_model_arguments(require_model_arg=False)
-    parser.add_lora_arguments()
-    parser.add_image_generator_arguments(supports_metadata_config=False)
     parser.add_fill_arguments()
+    parser.add_lora_arguments()
+    parser.add_image_generator_arguments(supports_metadata_config=True)
     parser.add_output_arguments()
     args = parser.parse_args()
 
@@ -31,7 +31,11 @@ def main():
 
     # 2. Register the optional callbacks
     if args.stepwise_image_output_dir:
-        handler = StepwiseHandler(flux=flux, output_dir=args.stepwise_image_output_dir)
+        handler = StepwiseHandler(
+            flux=flux, 
+            output_dir=args.stepwise_image_output_dir,
+            single_image=getattr(args, 'stepwise_single_image', False)
+        )
         CallbackRegistry.register_before_loop(handler)
         CallbackRegistry.register_in_loop(handler)
         CallbackRegistry.register_interrupt(handler)
@@ -45,19 +49,37 @@ def main():
 
     try:
         for seed in args.seed:
-            # 3. Generate an image for each seed value
-            image = flux.generate_image(
-                seed=seed,
-                prompt=args.prompt,
-                config=Config(
-                    num_inference_steps=args.steps,
-                    height=args.height,
-                    width=args.width,
-                    guidance=args.guidance,
-                    image_path=args.image_path,
-                    masked_image_path=args.masked_image_path,
-                ),
-            )
+            dual_prompts = getattr(args, 'dual_prompts', False)
+            clip_l_prompt = getattr(args, 'clip_l_prompt', "")
+            t5_prompt = getattr(args, 't5_prompt', "")
+            if dual_prompts:
+                image = flux.generate_image(
+                    seed=seed,
+                    clip_l_prompt=clip_l_prompt,
+                    t5_prompt=t5_prompt,
+                    dual_prompts=True,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                        masked_image_path=args.masked_image_path,
+                    ),
+                )
+            else:
+                image = flux.generate_image(
+                    seed=seed,
+                    prompt=args.prompt,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                        masked_image_path=args.masked_image_path,
+                    ),
+                )
 
             # 4. Save the image
             image.save(path=args.output.format(seed=seed), export_json_metadata=args.metadata)

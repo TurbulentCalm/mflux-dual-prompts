@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from mflux import Config, StopImageGenerationException
+from mflux import Config, ModelConfig, StopImageGenerationException
 from mflux.callbacks.callback_registry import CallbackRegistry
 from mflux.callbacks.instances.memory_saver import MemorySaver
 from mflux.callbacks.instances.stepwise_handler import StepwiseHandler
@@ -15,31 +15,29 @@ def main():
     parser = CommandLineParser(description="Generate an image using in-context LoRA with a reference image.")
     parser.add_general_arguments()
     parser.add_model_arguments(require_model_arg=False)
+    parser.add_image_to_image_arguments(required=True)
     parser.add_lora_arguments()
     parser.add_image_generator_arguments(supports_metadata_config=True)
-    parser.add_image_to_image_arguments(required=True)
+    parser.add_argument('--save-full-image', action='store_true', help='Save the complete image with both reference image and generated image')
     parser.add_output_arguments()
-    parser.add_argument(
-        "--save-full-image",
-        action="store_true",
-        default=False,
-        help="Additionally, save the full image containing the reference image. Useful for verifying the in-context usage of the reference image.",
-    )
     args = parser.parse_args()
 
     # 1. Load the model
     flux = Flux1InContextLoRA(
-        model_config=ModelConfig.dev(),
+        model_config=ModelConfig.from_name(model_name=args.model, base_model=args.base_model),
         quantize=args.quantize,
-        lora_names=[get_lora_filename(args.lora_style)] if args.lora_style else None,
-        lora_repo_id=LORA_REPO_ID if args.lora_style else None,
+        local_path=args.path,
         lora_paths=args.lora_paths,
         lora_scales=args.lora_scales,
     )
 
     # 2. Register the optional callbacks
     if args.stepwise_image_output_dir:
-        handler = StepwiseHandler(flux=flux, output_dir=args.stepwise_image_output_dir)
+        handler = StepwiseHandler(
+            flux=flux, 
+            output_dir=args.stepwise_image_output_dir,
+            single_image=getattr(args, 'stepwise_single_image', False)
+        )
         CallbackRegistry.register_before_loop(handler)
         CallbackRegistry.register_in_loop(handler)
         CallbackRegistry.register_interrupt(handler)
@@ -53,18 +51,35 @@ def main():
 
     try:
         for seed in args.seed:
-            # 3. Generate an image for each seed value
-            image = flux.generate_image(
-                seed=seed,
-                prompt=args.prompt,
-                config=Config(
-                    num_inference_steps=args.steps,
-                    height=args.height,
-                    width=args.width,
-                    guidance=args.guidance,
-                    image_path=args.image_path,
-                ),
-            )
+            dual_prompts = getattr(args, 'dual_prompts', False)
+            clip_l_prompt = getattr(args, 'clip_l_prompt', "")
+            t5_prompt = getattr(args, 't5_prompt', "")
+            if dual_prompts:
+                image = flux.generate_image(
+                    seed=seed,
+                    clip_l_prompt=clip_l_prompt,
+                    t5_prompt=t5_prompt,
+                    dual_prompts=True,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                    ),
+                )
+            else:
+                image = flux.generate_image(
+                    seed=seed,
+                    prompt=args.prompt,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                    ),
+                )
             # 4. Save the image
             output_path = Path(args.output.format(seed=seed))
             image.get_right_half().save(path=output_path, export_json_metadata=args.metadata)

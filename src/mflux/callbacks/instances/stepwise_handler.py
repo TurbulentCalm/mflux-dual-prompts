@@ -15,10 +15,12 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         self,
         flux,
         output_dir: str,
+        single_image: bool = False,
     ):
         self.flux = flux
         self.output_dir = Path(output_dir)
         self.step_wise_images = []
+        self.single_image = single_image
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -92,10 +94,20 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
             lora_scales=self.flux.lora_scales,
             generation_time=generation_time,
         )
-        stepwise_img.save(
-            path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
-            export_json_metadata=False,
-        )
+        
+        if self.single_image:
+            # Save/overwrite to a consistent filename when in single image mode
+            stepwise_img.save(
+                path=self.output_dir / f"seed_{seed}_current_step.png",
+                export_json_metadata=False,
+            )
+        else:
+            # Default behavior: save a separate file for each step
+            stepwise_img.save(
+                path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
+                export_json_metadata=False,
+            )
+            
         self.step_wise_images.append(stepwise_img)
         self._save_composite(seed=seed)
 

@@ -18,7 +18,7 @@ class ModelSpecAction(argparse.Action):
             setattr(namespace, self.dest, values)
             return
 
-        if values.count("/") != 1:
+        if values is None or values.count("/") != 1:
             raise argparse.ArgumentError(
                 self,
                 (f'Value must be either {" ".join(ui_defaults.MODEL_CHOICES)} or in format "org/model". Got: {values}'),
@@ -71,7 +71,12 @@ class CommandLineParser(argparse.ArgumentParser):
         self.add_argument("--guidance", type=float, default=ui_defaults.GUIDANCE_SCALE, help=f"Guidance Scale (Default is {ui_defaults.GUIDANCE_SCALE})")
 
     def add_image_generator_arguments(self, supports_metadata_config=False) -> None:
-        self.add_argument("--prompt", type=str, required=(not supports_metadata_config), default=None, help="The textual description of the image to generate.")
+        prompt_group = self.add_argument_group("Prompt configuration")
+        prompt_group.add_argument("--prompt", type=str, required=(not supports_metadata_config), default=None, help="The textual description of the image to generate.")
+        prompt_group.add_argument("--dual-prompts", "--dual_prompts", dest="dual_prompts", action="store_true", help="Enable dual prompts mode to use separate prompts for CLIP_L and T5 encoders.")
+        prompt_group.add_argument("--clip_l-prompt", "--clip_l_prompt", dest="clip_l_prompt", type=str, default=None, help="The textual description for the CLIP_L encoder when dual prompts mode is enabled.")
+        prompt_group.add_argument("--t5-prompt", "--t5_prompt", dest="t5_prompt", type=str, default=None, help="The textual description for the T5 encoder when dual prompts mode is enabled.")
+        
         self.add_argument("--seed", type=int, default=None, nargs='+', help="Specify 1+ Entropy Seeds (Default is 1 time-based random-seed)")
         self.add_argument("--auto-seeds", type=int, default=-1, help="Auto generate N Entropy Seeds (random ints between 0 and 1 billion")
         self._add_image_generator_common_arguments()
@@ -108,6 +113,7 @@ class CommandLineParser(argparse.ArgumentParser):
         self.add_argument("--metadata", action="store_true", help="Export image metadata as a JSON file.")
         self.add_argument("--output", type=str, default="image.png", help="The filename for the output image. Default is \"image.png\".")
         self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write step-wise images and their final composite image to. This feature may change in future versions.')
+        self.add_argument('--stepwise-single-image', action='store_true', help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, creates a single image file that is updated at each step instead of separate files.')
 
     def add_image_outpaint_arguments(self, required=False) -> None:
         self.supports_image_outpaint = True
@@ -138,6 +144,17 @@ class CommandLineParser(argparse.ArgumentParser):
         if hasattr(namespace, "path") and namespace.path is not None and namespace.model is None and not has_training_args:
             self.error("--model must be specified when using --path")
 
+        # Validate dual prompts configuration
+        if getattr(namespace, "dual_prompts", False):
+            clip_l_prompt = getattr(namespace, "clip_l_prompt", None)
+            t5_prompt = getattr(namespace, "t5_prompt", None)
+            if clip_l_prompt is None:
+                self.error("--clip_l-prompt or --clip_l_prompt is required when dual prompts mode is enabled")
+            if t5_prompt is None:
+                self.error("--t5-prompt or --t5_prompt is required when dual prompts mode is enabled")
+            # When dual prompts is enabled, we'll ignore the standard prompt
+            namespace.prompt = None
+        
         if getattr(namespace, "config_from_metadata", False):
             prior_gen_metadata = json.load(namespace.config_from_metadata.open("rt"))
 
@@ -148,8 +165,10 @@ class CommandLineParser(argparse.ArgumentParser):
             if namespace.base_model is None:
                 namespace.base_model = prior_gen_metadata.get("base_model", None)
 
-            if namespace.prompt is None:
-                namespace.prompt = prior_gen_metadata.get("prompt", None)
+            # Only load prompt from metadata if dual prompts is not enabled
+            if not (getattr(namespace, "dual_prompts", False)):
+                if namespace.prompt is None:
+                    namespace.prompt = prior_gen_metadata.get("prompt", None)
 
             # all configs from the metadata config defers to any explicitly defined args
             guidance_default = self.get_default("guidance")
@@ -219,9 +238,9 @@ class CommandLineParser(argparse.ArgumentParser):
             output_path = Path(namespace.output)
             namespace.output = str(output_path.with_stem(output_path.stem + "_seed_{seed}"))
 
-        if self.supports_image_generation and namespace.prompt is None:
-            # not supplied by CLI and not supplied by metadata config file
-            self.error("--prompt argument required or 'prompt' required in metadata config file")
+        if self.supports_image_generation and namespace.prompt is None and not (getattr(namespace, "dual_prompts", False)):
+            # not supplied by CLI and not supplied by metadata config file and dual prompts not enabled
+            self.error("--prompt argument required or 'prompt' required in metadata config file (or use dual prompts mode with --clip_l-prompt/--clip_l_prompt and --t5-prompt/--t5_prompt)")
 
         if self.supports_image_generation and namespace.steps is None:
             namespace.steps = ui_defaults.MODEL_INFERENCE_STEPS.get(namespace.model, 14)
