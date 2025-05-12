@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import mlx.core as mx
 import PIL.Image
@@ -97,8 +98,17 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         
         if self.single_image:
             # Save/overwrite to a consistent filename when in single image mode
+            single_image_path = self.output_dir / f"seed_{seed}_latest.png"
+            
+            # Remove any existing numbered files that might have been created
+            for old_file in self.output_dir.glob(f"seed_{seed}_current_step*.png"):
+                try:
+                    os.unlink(old_file)
+                except OSError:
+                    pass
+                    
             stepwise_img.save(
-                path=self.output_dir / f"seed_{seed}_current_step.png",
+                path=single_image_path,
                 export_json_metadata=False,
             )
         else:
