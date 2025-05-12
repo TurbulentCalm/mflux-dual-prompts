@@ -42,6 +42,7 @@ def main():
         CallbackRegistry.register_before_loop(handler)
         CallbackRegistry.register_in_loop(handler)
         CallbackRegistry.register_interrupt(handler)
+        CallbackRegistry.register_after_loop(handler)
 
     memory_saver = None
     if args.low_ram:
