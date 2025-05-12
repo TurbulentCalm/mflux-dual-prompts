@@ -12,6 +12,14 @@ from mflux.ui import (
 )
 
 
+def float_type(arg):
+    """Custom type function that strips whitespace and converts to float.
+    Useful for making CLI arguments more tolerant of trailing spaces."""
+    if isinstance(arg, str):
+        arg = arg.strip()
+    return float(arg)
+
+
 class ModelSpecAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if values in ui_defaults.MODEL_CHOICES:
@@ -59,7 +67,7 @@ class CommandLineParser(argparse.ArgumentParser):
         lora_group = self.add_argument_group("LoRA configuration")
         lora_group.add_argument("--lora-style", type=str, choices=sorted(LORA_NAME_MAP.keys()), help="Style of the LoRA to use (e.g., 'storyboard' for film storyboard style)")
         self.add_argument("--lora-paths", type=str, nargs="*", default=None, help="Local safetensors for applying LORA from disk")
-        self.add_argument("--lora-scales", type=float, nargs="*", default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
+        self.add_argument("--lora-scales", type=float_type, nargs="*", default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
         lora_group.add_argument("--lora-name", type=str, help="Name of the LoRA to download from Hugging Face")
         lora_group.add_argument("--lora-repo-id", type=str, default=LORA_REPO_ID, help=f"Hugging Face repository ID for LoRAs (default: {LORA_REPO_ID})")
 
