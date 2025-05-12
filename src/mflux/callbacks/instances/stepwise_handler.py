@@ -7,13 +7,13 @@ import mlx.core as mx
 import PIL.Image
 import tqdm
 
-from mflux.callbacks.callback import BeforeLoopCallback, InLoopCallback, InterruptCallback
+from mflux.callbacks.callback import BeforeLoopCallback, InLoopCallback, InterruptCallback, AfterLoopCallback
 from mflux.config.runtime_config import RuntimeConfig
 from mflux.post_processing.array_util import ArrayUtil
 from mflux.post_processing.image_util import ImageUtil
 
 
-class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
+class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback, AfterLoopCallback):
     def __init__(
         self,
         flux,
@@ -93,6 +93,17 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
             time_steps=time_steps,
         )
 
+    def call_after_loop(
+        self,
+        seed: int,
+        prompt: str,
+        latents: mx.array,
+        config: RuntimeConfig,
+        time_steps: tqdm,
+    ) -> None:
+        """Called after the generation loop completes successfully"""
+        self._create_final_images(seed, prompt, latents, config, time_steps)
+
     def call_interrupt(
         self,
         t: int,
@@ -102,31 +113,9 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         config: RuntimeConfig,
         time_steps: tqdm,
     ) -> None:
+        """Called if the generation is interrupted"""
         if self.single_image:
-            # For single image mode, create composite at the end if it hasn't been created yet
-            if not self.composite_saved and self.single_latest_image is not None:
-                # Save the final image with the proper seed name
-                final_path = self.output_dir / f"seed_{seed}_final.png"
-                self.single_latest_image.save(
-                    path=final_path,
-                    export_json_metadata=False,
-                )
-                
-                # Create a new composite image from the single latest image
-                composite_img = ImageUtil.to_composite_image([self.single_latest_image])
-                composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
-                self.composite_saved = True
-                
-                # Remove all progress files since we're done
-                print(f"Cleaning up progress files...")
-                try:
-                    # Clean up all progress files with this timestamp
-                    pattern = str(self.output_dir / f"progress_{self.timestamp}_*.png")
-                    for file_path in glob.glob(pattern):
-                        print(f"Removing {file_path}")
-                        os.unlink(file_path)
-                except Exception as e:
-                    print(f"Warning: Error cleaning up progress files: {e}")
+            self._create_final_images(seed, prompt, latents, config, time_steps)
         else:
             # Original behavior for multi-file mode
             self._save_composite(seed=seed)
@@ -181,3 +170,39 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         if self.step_wise_images:
             composite_img = ImageUtil.to_composite_image(self.step_wise_images)
             composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
+
+    def _create_final_images(
+        self,
+        seed: int,
+        prompt: str,
+        latents: mx.array,
+        config: RuntimeConfig,
+        time_steps: tqdm,
+    ) -> None:
+        """Create the final and composite images, and clean up temporary files"""
+        if self.single_image and not self.composite_saved and self.single_latest_image is not None:
+            # Save the final image with the proper seed name
+            final_path = self.output_dir / f"seed_{seed}_final.png"
+            print(f"Saving final image to {final_path}")
+            self.single_latest_image.save(
+                path=final_path,
+                export_json_metadata=False,
+            )
+            
+            # Create a new composite image from the single latest image
+            composite_path = self.output_dir / f"seed_{seed}_composite.png"
+            print(f"Saving composite image to {composite_path}")
+            composite_img = ImageUtil.to_composite_image([self.single_latest_image])
+            composite_img.save(composite_path)
+            self.composite_saved = True
+            
+            # Remove all progress files since we're done
+            print(f"Cleaning up progress files...")
+            try:
+                # Clean up all progress files with this timestamp
+                pattern = str(self.output_dir / f"progress_{self.timestamp}_*.png")
+                for file_path in glob.glob(pattern):
+                    print(f"Removing {file_path}")
+                    os.unlink(file_path)
+            except Exception as e:
+                print(f"Warning: Error cleaning up progress files: {e}")
