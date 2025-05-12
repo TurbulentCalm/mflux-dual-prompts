@@ -99,7 +99,7 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback, Aft
         prompt: str,
         latents: mx.array,
         config: RuntimeConfig,
-        time_steps: tqdm,
+        time_steps: tqdm = None,
     ) -> None:
         """Called after the generation loop completes successfully"""
         self._create_final_images(seed, prompt, latents, config, time_steps)
@@ -177,7 +177,7 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback, Aft
         prompt: str,
         latents: mx.array,
         config: RuntimeConfig,
-        time_steps: tqdm,
+        time_steps: tqdm = None,
     ) -> None:
         """Create the final and composite images, and clean up temporary files"""
         if self.single_image and not self.composite_saved and self.single_latest_image is not None:
