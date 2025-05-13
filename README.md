@@ -1264,3 +1264,57 @@ If you plan to contribute to this project (or submit a pull request):
 - **Documentation:** Update the README or docstrings for any user-facing changes or new features.
 
 Thank you for helping improve MFLUX!
+
+# Auto-Seeds Parameter
+
+The `--auto-seeds` parameter allows you to automatically generate multiple images with different random seeds in a single command:
+
+```sh
+# Generate 5 different images with random seeds
+mflux-generate --prompt "A beautiful landscape" --model schnell --auto-seeds 5
+```
+
+This will create 5 images with different random seeds, saving you from having to run multiple commands with different seed values.
+
+- When used with `--seed`, the `--auto-seeds` parameter is ignored
+- Output filenames will automatically include the seed value (e.g., `output_seed_1234567.png`)
+- Each seed creates a completely different image variation
+
+### New/Updated Command Line Arguments
+
+- **`--dual-prompts`** (flag): Enables dual prompt mode. When set, you must provide both `--clip_l-prompt` and `--t5-prompt`.
+- **`--clip_l-prompt`** (str): The prompt string for the CLIP_L encoder. Can be an empty string if you only want to use T5.
+- **`--t5-prompt`** (str): The prompt string for the T5 encoder. Can be an empty string if you only want to use CLIP_L.
+- **`--stepwise-single-image`** (flag): [EXPERIMENTAL] When used with `--stepwise-image-output-dir`, creates a single image file that is updated at each step instead of separate files.
+
+#### Dual Prompts Usage
+
+- If `--dual-prompts` is not set, the standard `--prompt` argument is used for both encoders.
+- If `--dual-prompts` is set, both `--clip_l-prompt` and `--t5-prompt` must be provided (empty strings are allowed).
+- Example:
+
+```sh
+python -m mflux.generate \
+  --debug \
+  --dual-prompts \
+  --clip_l-prompt "A large yellow bird" \
+  --t5-prompt "A child in a field" \
+  --prompt "A large yellow bird" \
+  --model schnell \
+  --steps 4 \
+  --output output.png
+```
+
+#### Stepwise Single Image Usage
+
+- Use `--stepwise-single-image` with `--stepwise-image-output-dir` to keep only one image file updated at each step, instead of saving all intermediate steps as separate files.
+- Example:
+
+```sh
+python -m mflux.generate \
+  --prompt "A sunset over mountains" \
+  --model schnell \
+  --steps 4 \
+  --stepwise-image-output-dir "./steps" \
+  --stepwise-single-image
+```

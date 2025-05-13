@@ -3,6 +3,8 @@ import json
 import random
 import time
 import typing as t
+import sys
+import re
 from pathlib import Path
 
 from mflux.community.in_context_lora.in_context_loras import LORA_NAME_MAP, LORA_REPO_ID
@@ -12,29 +14,85 @@ from mflux.ui import (
 )
 
 
-def float_type(arg):
-    """Custom type function that strips whitespace and converts to float.
-    Useful for making CLI arguments more tolerant of trailing spaces."""
-    if isinstance(arg, str):
-        arg = arg.strip()
-        if not arg:  # Skip empty strings
+def preprocess_args(args):
+    """Process command line arguments, handling backslash continuations that join values with flags."""
+    processed_args = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        
+        # Check if this argument might contain a concatenated flag due to backslash
+        backslash_value_match = re.match(r'^(.*?)\s+(--\w[\w-]*)(.*)$', arg)
+        
+        if backslash_value_match:
+            # Handle separated values and flags
+            value, flag, rest = backslash_value_match.groups()
+            
+            # Add the value
+            processed_args.append(value)
+            
+            # Add the flag (and its value if it has one)
+            if rest:
+                processed_args.append(f"{flag}{rest}")
+            else:
+                processed_args.append(flag)
+                # Check if the next arg is a flag value and not a flag
+                if i + 1 < len(args) and not args[i+1].startswith('--'):
+                    processed_args.append(args[i+1])
+                    i += 1
+        else:
+            # Just a normal argument
+            processed_args.append(arg)
+        
+        i += 1
+    
+    return processed_args
+
+
+def safe_float(value):
+    """Convert a string to float, handling whitespace and other issues.
+    Returns None for empty strings after stripping whitespace."""
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
             return None
-    return float(arg)
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        # If we can't convert, return the original value and let argparse handle the error
+        return value
 
 
 class LoraScalesAction(argparse.Action):
-    """Custom action for lora-scales to filter out None/empty values"""
+    """Custom action for lora-scales to filter out None/empty values and split space-separated values."""
     def __call__(self, parser, namespace, values, option_string=None):
         # Filter out None values (which come from empty strings)
         if values is None:
             setattr(namespace, self.dest, None)
             return
         
-        filtered_values = [v for v in values if v is not None]
-        if not filtered_values:
+        # Process values, handling both individual floats and space-separated values
+        processed_values = []
+        for val in values:
+            if val is None:
+                continue
+                
+            # Check if this is a space-separated list of values (like "1.2 0.7")
+            if isinstance(val, str) and ' ' in val.strip():
+                # Split and convert each part to float
+                try:
+                    parts = [float(part.strip()) for part in val.split() if part.strip()]
+                    processed_values.extend(parts)
+                except ValueError:
+                    # If conversion fails, just add the original value
+                    processed_values.append(val)
+            else:
+                processed_values.append(val)
+        
+        if not processed_values:
             setattr(namespace, self.dest, None)  # If all values were filtered out, use None
         else:
-            setattr(namespace, self.dest, filtered_values)
+            setattr(namespace, self.dest, processed_values)
 
 
 class ModelSpecAction(argparse.Action):
@@ -68,6 +126,7 @@ class CommandLineParser(argparse.ArgumentParser):
 
     def add_general_arguments(self) -> None:
         self.add_argument("--low-ram", action="store_true", help="Enable low-RAM mode to reduce memory usage (may impact performance).")
+        self.add_argument("--debug", action="store_true", help="Print debug information about command arguments and execution.")
 
     def add_model_arguments(self, path_type: t.Literal["load", "save"] = "load", require_model_arg: bool = True) -> None:
         self.require_model_arg = require_model_arg
@@ -84,7 +143,7 @@ class CommandLineParser(argparse.ArgumentParser):
         lora_group = self.add_argument_group("LoRA configuration")
         lora_group.add_argument("--lora-style", type=str, choices=sorted(LORA_NAME_MAP.keys()), help="Style of the LoRA to use (e.g., 'storyboard' for film storyboard style)")
         self.add_argument("--lora-paths", type=str, nargs="*", default=None, help="Local safetensors for applying LORA from disk")
-        self.add_argument("--lora-scales", type=float_type, nargs="*", action=LoraScalesAction, default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
+        self.add_argument("--lora-scales", type=float, nargs="*", default=None, help="Scaling factor to adjust the impact of LoRA weights on the model. A value of 1.0 applies the LoRA weights as they are.")
         lora_group.add_argument("--lora-name", type=str, help="Name of the LoRA to download from Hugging Face")
         lora_group.add_argument("--lora-repo-id", type=str, default=LORA_REPO_ID, help=f"Hugging Face repository ID for LoRAs (default: {LORA_REPO_ID})")
 
@@ -103,7 +162,7 @@ class CommandLineParser(argparse.ArgumentParser):
         prompt_group.add_argument("--t5-prompt", "--t5_prompt", dest="t5_prompt", type=str, default=None, help="The textual description for the T5 encoder when dual prompts mode is enabled.")
         
         self.add_argument("--seed", type=int, default=None, nargs='+', help="Specify 1+ Entropy Seeds (Default is 1 time-based random-seed)")
-        self.add_argument("--auto-seeds", type=int, default=-1, help="Auto generate N Entropy Seeds (random ints between 0 and 1 billion")
+        self.add_argument("--auto-seeds", type=int, default=0, help="Generate N random seed values automatically (creates N different images with different random seeds)")
         self._add_image_generator_common_arguments()
         if supports_metadata_config:
             self.add_metadata_config()
@@ -138,7 +197,7 @@ class CommandLineParser(argparse.ArgumentParser):
         self.add_argument("--metadata", action="store_true", help="Export image metadata as a JSON file.")
         self.add_argument("--output", type=str, default="image.png", help="The filename for the output image. Default is \"image.png\".")
         self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write step-wise images and their final composite image to. This feature may change in future versions.')
-        self.add_argument('--stepwise-single-image', action='store_true', help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, creates a single image file that is updated at each step instead of separate files.')
+        self.add_argument('--stepwise-single-image', '--stepwise_single_image', dest="stepwise_single_image", action="store_true", help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, creates a single image file that is updated at each step instead of separate files.')
 
     def add_image_outpaint_arguments(self, required=False) -> None:
         self.supports_image_outpaint = True
@@ -158,8 +217,115 @@ class CommandLineParser(argparse.ArgumentParser):
         self.add_argument("--train-config", type=str, required=False, help="Local path of the training configuration file")
         self.add_argument("--train-checkpoint", type=str, required=False, help="Local path of the checkpoint file which specifies how to continue the training process")
 
-    def parse_args(self, **kwargs) -> argparse.Namespace:
-        namespace = super().parse_args()
+    def parse_args(self, *args, **kwargs) -> argparse.Namespace:
+        # Get arguments to parse - either from args parameter or from command line
+        if args:
+            # Use provided args for programmatic usage
+            namespace = super().parse_args(*args, **kwargs)
+        else:
+            try:
+                # Preprocess the arguments to handle backslash issues
+                cli_args = sys.argv[1:]
+                processed_args = []
+                i = 0
+                
+                while i < len(cli_args):
+                    arg = cli_args[i]
+                    
+                    # Check if this could be a backslash-related problem
+                    if " --" in arg and not arg.startswith("--"):
+                        # This could be a value followed by another argument due to backslash line continuation
+                        parts = arg.split(" --", 1)
+                        processed_args.append(parts[0])  # Add the value part
+                        processed_args.append("--" + parts[1])  # Add the flag part
+                    else:
+                        # Just keep the argument as is
+                        processed_args.append(arg)
+                    
+                    i += 1
+                
+                # Filter out any completely empty arguments
+                filtered_args = [arg for arg in processed_args if arg.strip()]
+                namespace = super().parse_args(filtered_args, **kwargs)
+            except Exception as e:
+                # Fall back to standard parsing if preprocessing fails
+                filtered_args = [arg for arg in sys.argv[1:] if arg.strip()]
+                namespace = super().parse_args(filtered_args, **kwargs)
+            
+            # Print debug output if requested
+            if getattr(namespace, "debug", False):
+                print("\n===== DEBUG: Command Arguments =====")
+                
+                # Build a map of dest->original_name from all arguments
+                arg_name_mapping = {}
+                for action in self._actions:
+                    if action.dest != 'help':  # Skip the help action
+                        # Find the longest option (most likely the primary name)
+                        primary_option = max(action.option_strings, key=len) if action.option_strings else None
+                        if primary_option:
+                            # Store without the -- prefix
+                            arg_name_mapping[action.dest] = primary_option.lstrip('-')
+                
+                # Print all args in the logical order they were defined in the parser
+                # First, get important general args
+                debug_order = [
+                    'low-ram', 'debug', 'model', 'path', 'base-model', 'quantize'
+                ]
+                
+                # Then add LoRA-related args
+                lora_args = [
+                    'lora-style', 'lora-paths', 'lora-scales', 'lora-name', 'lora-repo-id'
+                ]
+                debug_order.extend(lora_args)
+                
+                # Then prompt-related args
+                prompt_args = [
+                    'prompt', 'dual-prompts', 'clip_l-prompt', 't5-prompt'
+                ]
+                debug_order.extend(prompt_args)
+                
+                # Then generation parameters
+                generation_args = [
+                    'seed', 'auto-seeds', 'height', 'width', 'steps', 'guidance'
+                ]
+                debug_order.extend(generation_args)
+                
+                # Then image manipulation args
+                image_args = [
+                    'image-path', 'image-strength',
+                ]
+                debug_order.extend(image_args)
+                
+                # Then output args
+                output_args = [
+                    'metadata', 'output', 'stepwise-image-output-dir', 'stepwise-single-image'
+                ]
+                debug_order.extend(output_args)
+                
+                # Convert to set for faster lookups
+                printed_keys = set()
+                
+                # Print in our specified order first
+                for arg_name in debug_order:
+                    # Find the corresponding key in the namespace
+                    matching_key = None
+                    for key, display_name in arg_name_mapping.items():
+                        if display_name == arg_name:
+                            matching_key = key
+                            break
+                    
+                    if matching_key and hasattr(namespace, matching_key):
+                        value = getattr(namespace, matching_key)
+                        print(f"{arg_name}: {value}")
+                        printed_keys.add(matching_key)
+                
+                # Print any remaining args not in our predefined order
+                for key, value in vars(namespace).items():
+                    if key not in printed_keys:
+                        display_name = arg_name_mapping.get(key, key)
+                        print(f"{display_name}: {value}")
+                
+                print("===================================\n")
 
         # Check if either training arguments are provided
         has_training_args = (hasattr(namespace, "train_config") and namespace.train_config is not None) or \
@@ -173,13 +339,17 @@ class CommandLineParser(argparse.ArgumentParser):
         if getattr(namespace, "dual_prompts", False):
             clip_l_prompt = getattr(namespace, "clip_l_prompt", None)
             t5_prompt = getattr(namespace, "t5_prompt", None)
-            if clip_l_prompt is None:
-                self.error("--clip_l-prompt or --clip_l_prompt is required when dual prompts mode is enabled")
-            if t5_prompt is None:
-                self.error("--t5-prompt or --t5_prompt is required when dual prompts mode is enabled")
-            # When dual prompts is enabled, we'll ignore the standard prompt
+            
+            # When dual prompts is enabled, always override the standard prompt to None
+            # regardless of what might have been set in the command line
             namespace.prompt = None
-        
+            
+            # Both prompts must be provided, though they can be empty strings
+            if clip_l_prompt is None:
+                self.error("--clip_l-prompt is required when dual prompts mode is enabled")
+            if t5_prompt is None:
+                self.error("--t5-prompt is required when dual prompts mode is enabled")
+
         if getattr(namespace, "config_from_metadata", False):
             prior_gen_metadata = json.load(namespace.config_from_metadata.open("rt"))
 
@@ -252,6 +422,9 @@ class CommandLineParser(argparse.ArgumentParser):
         if self.supports_image_generation and namespace.seed is None and namespace.auto_seeds > 0:
             # choose N int seeds in the range of  0 < value < 1 billion
             namespace.seed = [random.randint(0, int(1e7)) for _ in range(namespace.auto_seeds)]
+        elif self.supports_image_generation and namespace.seed is not None and namespace.auto_seeds > 0:
+            # Warn user that --auto-seeds is being ignored
+            print("\n⚠️  Warning: --auto-seeds is being ignored because --seed was specified. The --seed argument takes precedence.\n")
 
         if self.supports_image_generation and namespace.seed is None:
             # final default: did not obtain seed from metadata, --seed, or --auto-seeds
