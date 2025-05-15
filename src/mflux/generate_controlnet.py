@@ -44,21 +44,34 @@ def main():
 
     try:
         for seed in args.seed:
-            # 3. Generate an image for each seed value
-            image = flux.generate_image(
-                seed=seed,
-                prompt=args.prompt,
-                controlnet_image_path=args.controlnet_image_path,
-                config=Config(
-                    num_inference_steps=args.steps,
-                    height=args.height,
-                    width=args.width,
-                    guidance=args.guidance,
-                    controlnet_strength=args.controlnet_strength,
-                ),
-            )
-
-            # 4. Save the image
+            if getattr(args, "dual_prompts", False):
+                image = flux.generate_image(
+                    seed=seed,
+                    dual_prompt=True,
+                    clip_prompt=args.clip_prompt,
+                    t5_prompt=args.t5_prompt,
+                    controlnet_image_path=args.controlnet_image_path,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        controlnet_strength=args.controlnet_strength,
+                    ),
+                )
+            else:
+                image = flux.generate_image(
+                    seed=seed,
+                    prompt=args.prompt,
+                    controlnet_image_path=args.controlnet_image_path,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        controlnet_strength=args.controlnet_strength,
+                    ),
+                )
             image.save(path=args.output.format(seed=seed), export_json_metadata=args.metadata)
     except StopImageGenerationException as stop_exc:
         print(stop_exc)

@@ -14,6 +14,8 @@ Run the powerful [FLUX](https://blackforestlabs.ai/#get-flux) models from [Black
 - [💿 Installation](#-installation)
 - [🖼️ Generating an image](#%EF%B8%8F-generating-an-image)
   * [📜 Full list of Command-Line Arguments](#-full-list-of-command-line-arguments)
+  * [📜 Dual Prompts: CLIP and T5 Command-Line Arguments](#-dual-prompts-clip-and-t5-command-line-arguments)
+  * [📜 Stepwise Image Output and --stepwise-single-image](#-stepwise-image-output-and---stepwise-single-image)
 - [⏱️ Image generation speed (updated)](#%EF%B8%8F-image-generation-speed-updated)
 - [↔️ Equivalent to Diffusers implementation](#%EF%B8%8F-equivalent-to-diffusers-implementation)
 - [🗜️ Quantization](#%EF%B8%8F-quantization)
@@ -162,7 +164,9 @@ mflux-generate --model dev --prompt "Luxury food photograph" --steps 25 --seed 2
 #### 📜 Full list of Command-Line Arguments
 
 - **`--prompt`** (required, `str`): Text description of the image to generate.
-
+- **`--dual-prompts`** (flag): Enables dual prompt mode. When set, you must provide both `--clip-prompt` and `--t5-prompt`.
+- **`--clip-prompt`** (str): The prompt string for the CLIP encoder. Can be omitted or set to an empty string (`""` or `''`) if you only want to use T5.
+- **`--t5-prompt`** (str): The prompt string for the T5 encoder. Can be omitted or set to an empty string (`""` or `''`) if you only want to use CLIP.
 - **`--model`** or **`-m`** (required, `str`): Model to use for generation. Can be one of the official models (`"schnell"` or `"dev"`) or a HuggingFace repository ID for a compatible third-party model (e.g., `"Freepik/flux.1-lite-8B-alpha"`).
 
 - **`--base-model`** (optional, `str`, default: `None`): Specifies which base architecture a third-party model is derived from (`"schnell"` or `"dev"`). Required when using third-party models from HuggingFace.
@@ -204,6 +208,64 @@ mflux-generate --model dev --prompt "Luxury food photograph" --steps 25 --seed 2
 - **`--lora-repo-id`** (optional, `str`, default: `"ali-vilab/In-Context-LoRA"`): The Hugging Face repository ID for LoRAs.
 
 - **`--stepwise-image-output-dir`** (optional, `str`, default: `None`): [EXPERIMENTAL] Output directory to write step-wise images and their final composite image to. This feature may change in future versions. When specified, MFLUX will save an image for each denoising step, allowing you to visualize the generation process from noise to final image.
+
+- **`--stepwise-single-image`** (optional, action='store_true'): [EXPERIMENTAL] When used with `--stepwise-image-output-dir`, creates a single image file that is updated at each step instead of separate files for each step. This allows you to monitor a single file to see the progression of the image generation, which is useful for real-time visualization and when you don't need to preserve intermediate steps.
+
+### 📜 Dual Prompts: CLIP and T5 Command-Line Arguments
+
+MFLUX now supports **dual prompts** for advanced users who want to control the CLIP and T5 text encoders separately. This allows you to bypass the 77-token limit of CLIP and experiment with prompt influence on image generation.
+
+**New arguments:**
+- `--dual-prompts` (flag): Enables dual prompt mode. When set, you may provide either or both `--clip-prompt` and `--t5-prompt`.
+- `--clip-prompt` (str): The prompt string for the CLIP encoder. Can be omitted or set to an empty string (`""` or `''`) if you only want to use T5.
+- `--t5-prompt` (str): The prompt string for the T5 encoder. Can be omitted or set to an empty string (`""` or `''`) if you only want to use CLIP.
+
+**Usage notes:**
+- When `--dual-prompts` is set, you may provide either or both of `--clip-prompt` and `--t5-prompt`. At least one must be non-empty (not just whitespace).
+- If you wish to leave one prompt blank, you may omit it entirely or use `""` or `''` as a placeholder.
+- If both are omitted or blank, the CLI will raise an error.
+- The T5 prompt generally has a stronger influence on the generated image than the CLIP prompt.
+- You can experiment by leaving one prompt empty to see the effect of each encoder.
+
+**Example:**
+```sh
+mflux-generate \
+  --dual-prompts \
+  --clip-prompt "A large yellow bird" \
+  --t5-prompt "" \
+  --model schnell \
+  --steps 4 \
+  --seed 2 \
+  --output output.png
+```
+
+This will use only the CLIP encoder for guidance. To use only T5, swap the prompts or omit `--clip-prompt` entirely.
+
+### 📜 Stepwise Image Output and --stepwise-single-image
+
+MFLUX supports saving intermediate images at each denoising step using the `--stepwise-image-output-dir` flag. This is useful for debugging, creating animations, or visualizing the progression of image generation.
+
+**Original Stepwise Feature:**
+- When `--stepwise-image-output-dir` is specified, MFLUX saves an image for each denoising step in the specified directory. Filenames are typically of the form `seed_1234_step1of4.png`, `seed_1234_step2of4.png`, etc.
+- The final composite image is also saved in the same directory.
+
+**New --stepwise-single-image Flag:**
+- When used together with `--stepwise-image-output-dir`, the `--stepwise-single-image` flag changes the behavior so that only a single image file is created and updated at each step. This is useful for real-time monitoring or when you do not need to keep all intermediate steps.
+- The single file is typically named `seed_1234_current_step.png` and is overwritten at each step, plus the final composite image is still saved.
+
+**Examples:**
+
+*Default behavior (multiple files):*
+```sh
+mflux-generate --prompt "A sunset over mountains" --model schnell --steps 4 --stepwise-image-output-dir "./steps"
+```
+This will create files like: `seed_1234_step1of4.png`, `seed_1234_step2of4.png`, etc.
+
+*Single image mode:*
+```sh
+mflux-generate --prompt "A sunset over mountains" --model schnell --steps 4 --stepwise-image-output-dir "./steps" --stepwise-single-image
+```
+This will create and continuously update a single file: `seed_1234_current_step.png` (plus the composite image).
 
 #### 📜 In-Context LoRA Command-Line Arguments
 
@@ -1209,3 +1271,5 @@ MFLUX would not be possible without the great work of:
 ### ⚖️ License
 
 This project is licensed under the [MIT License](LICENSE).
+
+

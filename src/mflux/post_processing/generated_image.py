@@ -29,6 +29,9 @@ class GeneratedImage:
         masked_image_path: str | Path | None = None,
         depth_image_path: str | Path | None = None,
         redux_image_paths: list[str] | list[Path] | None = None,
+        dual_prompt: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
     ):
         self.image = image
         self.model_config = model_config
@@ -48,6 +51,9 @@ class GeneratedImage:
         self.masked_image_path = masked_image_path
         self.depth_image_path = depth_image_path
         self.redux_image_paths = redux_image_paths
+        self.dual_prompt = dual_prompt
+        self.clip_prompt = clip_prompt
+        self.t5_prompt = t5_prompt
 
     def get_right_half(self) -> "GeneratedImage":
         # Calculate the coordinates for the right half

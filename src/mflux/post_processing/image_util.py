@@ -32,6 +32,9 @@ class ImageUtil:
         image_strength: float | None = None,
         masked_image_path: str | Path | None = None,
         depth_image_path: str | Path | None = None,
+        dual_prompt: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
     ) -> GeneratedImage:
         normalized = ImageUtil._denormalize(decoded_latents)
         normalized_numpy = ImageUtil._to_numpy(normalized)
@@ -55,6 +58,9 @@ class ImageUtil:
             masked_image_path=masked_image_path,
             depth_image_path=depth_image_path,
             redux_image_paths=redux_image_paths,
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
 
     @staticmethod

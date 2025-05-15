@@ -54,23 +54,24 @@ class Flux1Redux(nn.Module):
     def generate_image(
         self,
         seed: int,
-        prompt: str,
-        config: Config,
+        prompt: str = None,
+        config: Config = None,
+        dual_prompt: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
     ) -> GeneratedImage:
-        # 0. Create a new runtime config based on the model type and input parameters
         config = RuntimeConfig(config, self.model_config)
         time_steps = tqdm(range(config.init_time_step, config.num_inference_steps))
-
-        # 1. Create the initial latents
         latents = LatentCreator.create(
             seed=seed,
             height=config.height,
             width=config.width,
         )
-
-        # 2. Get prompt embeddings by fusing the prompt and image embeddings
-        prompt_embeds, pooled_prompt_embeds = Flux1Redux._get_prompt_embeddings(
+        prompt_embeds, pooled_prompt_embeds = self._get_prompt_embeddings(
             prompt=prompt,
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
             prompt_cache=self.prompt_cache,
             t5_tokenizer=self.t5_tokenizer,
             clip_tokenizer=self.clip_tokenizer,
@@ -79,19 +80,15 @@ class Flux1Redux(nn.Module):
             image_paths=config.redux_image_paths,
             image_encoder=self.image_encoder,
             image_embedder=self.image_embedder,
-        )  # fmt: off
-
-        # (Optional) Call subscribers for beginning of loop
+        )
         Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
             config=config,
-        )  # fmt: off
-
+        )
         for t in time_steps:
             try:
-                # 3.t Predict the noise
                 noise = self.transformer(
                     t=t,
                     config=config,
@@ -99,12 +96,8 @@ class Flux1Redux(nn.Module):
                     prompt_embeds=prompt_embeds,
                     pooled_prompt_embeds=pooled_prompt_embeds,
                 )
-
-                # 4.t Take one denoise step
                 dt = config.sigmas[t + 1] - config.sigmas[t]
                 latents += noise * dt
-
-                # (Optional) Call subscribers in-loop
                 Callbacks.in_loop(
                     t=t,
                     seed=seed,
@@ -112,12 +105,9 @@ class Flux1Redux(nn.Module):
                     latents=latents,
                     config=config,
                     time_steps=time_steps,
-                )  # fmt: off
-
-                # (Optional) Evaluate to enable progress tracking
+                )
                 mx.eval(latents)
-
-            except KeyboardInterrupt:  # noqa: PERF203
+            except KeyboardInterrupt:
                 Callbacks.interruption(
                     t=t,
                     seed=seed,
@@ -127,16 +117,12 @@ class Flux1Redux(nn.Module):
                     time_steps=time_steps,
                 )
                 raise StopImageGenerationException(f"Stopping image generation at step {t + 1}/{len(time_steps)}")
-
-        # (Optional) Call subscribers after loop
         Callbacks.after_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
             config=config,
-        )  # fmt: off
-
-        # 7. Decode the latent array and return the image
+        )
         latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         decoded = self.vae.decode(latents)
         return ImageUtil.to_image(
@@ -144,6 +130,9 @@ class Flux1Redux(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
@@ -154,34 +143,42 @@ class Flux1Redux(nn.Module):
 
     @staticmethod
     def _get_prompt_embeddings(
-        prompt: str,
-        prompt_cache: dict[str, tuple[mx.array, mx.array]],
-        t5_tokenizer: TokenizerT5,
-        clip_tokenizer: TokenizerCLIP,
-        t5_text_encoder: T5Encoder,
-        clip_text_encoder: CLIPEncoder,
-        image_paths: list[str] | list[Path],
-        image_encoder: SiglipVisionTransformer,
-        image_embedder: ReduxEncoder,
+        prompt: str = None,
+        dual_prompt: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
+        prompt_cache: dict = None,
+        t5_tokenizer: T5Tokenizer = None,
+        clip_tokenizer: TokenizerCLIP = None,
+        t5_text_encoder: T5Encoder = None,
+        clip_text_encoder: CLIPEncoder = None,
+        image_paths: list = None,
+        image_encoder: SiglipVisionTransformer = None,
+        image_embedder: ReduxEncoder = None,
     ) -> tuple[mx.array, mx.array]:
-        # 1. Encode the prompt
-        prompt_embeds_txt, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-            prompt=prompt,
-            prompt_cache=prompt_cache,
-            t5_tokenizer=t5_tokenizer,
-            clip_tokenizer=clip_tokenizer,
-            t5_text_encoder=t5_text_encoder,
-            clip_text_encoder=clip_text_encoder,
-        )
-
-        # 2. Encode the image(s) using the Siglip and Redux encoder
+        if dual_prompt:
+            prompt_embeds_txt, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
+                clip_prompt=clip_prompt,
+                t5_prompt=t5_prompt,
+                prompt_cache=prompt_cache,
+                t5_tokenizer=t5_tokenizer,
+                clip_tokenizer=clip_tokenizer,
+                t5_text_encoder=t5_text_encoder,
+                clip_text_encoder=clip_text_encoder,
+            )
+        else:
+            prompt_embeds_txt, pooled_prompt_embeds = PromptEncoder.encode_prompt(
+                prompt=prompt,
+                prompt_cache=prompt_cache,
+                t5_tokenizer=t5_tokenizer,
+                clip_tokenizer=clip_tokenizer,
+                t5_text_encoder=t5_text_encoder,
+                clip_text_encoder=clip_text_encoder,
+            )
         image_embeds = ReduxUtil.embed_images(
             image_paths=image_paths,
             image_encoder=image_encoder,
             image_embedder=image_embedder,
-        )  # fmt:off
-
-        # 3. Join text embeddings with all image embeddings
+        )
         prompt_embeds = mx.concatenate([prompt_embeds_txt] + image_embeds, axis=1)
-
         return prompt_embeds, pooled_prompt_embeds

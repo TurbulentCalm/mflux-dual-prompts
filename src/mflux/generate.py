@@ -27,7 +27,11 @@ def main():
 
     # 2. Register the optional callbacks
     if args.stepwise_image_output_dir:
-        handler = StepwiseHandler(flux=flux, output_dir=args.stepwise_image_output_dir)
+        handler = StepwiseHandler(
+            flux=flux,
+            output_dir=args.stepwise_image_output_dir,
+            single_image=getattr(args, "stepwise_single_image", False),
+        )
         CallbackRegistry.register_before_loop(handler)
         CallbackRegistry.register_in_loop(handler)
         CallbackRegistry.register_interrupt(handler)
@@ -42,18 +46,34 @@ def main():
     try:
         for seed in args.seed:
             # 3. Generate an image for each seed value
-            image = flux.generate_image(
-                seed=seed,
-                prompt=args.prompt,
-                config=Config(
-                    num_inference_steps=args.steps,
-                    height=args.height,
-                    width=args.width,
-                    guidance=args.guidance,
-                    image_path=args.image_path,
-                    image_strength=args.image_strength,
-                ),
-            )
+            if getattr(args, "dual_prompts", False):
+                image = flux.generate_image(
+                    seed=seed,
+                    dual_prompt=True,
+                    clip_prompt=args.clip_prompt,
+                    t5_prompt=args.t5_prompt,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                        image_strength=args.image_strength,
+                    ),
+                )
+            else:
+                image = flux.generate_image(
+                    seed=seed,
+                    prompt=args.prompt,
+                    config=Config(
+                        num_inference_steps=args.steps,
+                        height=args.height,
+                        width=args.width,
+                        guidance=args.guidance,
+                        image_path=args.image_path,
+                        image_strength=args.image_strength,
+                    ),
+                )
             # 4. Save the image
             image.save(path=args.output.format(seed=seed), export_json_metadata=args.metadata)
     except StopImageGenerationException as stop_exc:

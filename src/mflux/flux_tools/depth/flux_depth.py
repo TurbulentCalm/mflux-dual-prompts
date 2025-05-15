@@ -48,31 +48,38 @@ class Flux1Depth(nn.Module):
     def generate_image(
         self,
         seed: int,
-        prompt: str,
-        config: Config,
+        prompt: str = None,
+        config: Config = None,
+        dual_prompt: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
     ) -> GeneratedImage:
-        # 0. Create a new runtime config based on the model type and input parameters
         config = RuntimeConfig(config, self.model_config)
         time_steps = tqdm(range(config.init_time_step, config.num_inference_steps))
-
-        # 1. Create the initial latents
         latents = LatentCreator.create(
             seed=seed,
             height=config.height,
             width=config.width,
         )
-
-        # 2. Encode the prompt
-        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-            prompt=prompt,
-            prompt_cache=self.prompt_cache,
-            t5_tokenizer=self.t5_tokenizer,
-            clip_tokenizer=self.clip_tokenizer,
-            t5_text_encoder=self.t5_text_encoder,
-            clip_text_encoder=self.clip_text_encoder,
-        )
-
-        # 3. Encode the depth map
+        if dual_prompt:
+            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
+                clip_prompt=clip_prompt,
+                t5_prompt=t5_prompt,
+                prompt_cache=self.prompt_cache,
+                t5_tokenizer=self.t5_tokenizer,
+                clip_tokenizer=self.clip_tokenizer,
+                t5_text_encoder=self.t5_text_encoder,
+                clip_text_encoder=self.clip_text_encoder,
+            )
+        else:
+            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
+                prompt=prompt,
+                prompt_cache=self.prompt_cache,
+                t5_tokenizer=self.t5_tokenizer,
+                clip_tokenizer=self.clip_tokenizer,
+                t5_text_encoder=self.t5_text_encoder,
+                clip_text_encoder=self.clip_text_encoder,
+            )
         static_depth_map, depth_image = DepthUtil.encode_depth_map(
             vae=self.vae,
             depth_pro=self.depth_pro,
@@ -80,22 +87,16 @@ class Flux1Depth(nn.Module):
             image_path=config.image_path,
             depth_image_path=config.depth_image_path,
         )
-
-        # (Optional) Call subscribers for beginning of loop
         Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
             config=config,
             depth_image=depth_image,
-        )  # fmt: off
-
+        )
         for t in time_steps:
             try:
-                # 4.t Concatenate the updated latents with the (static) depth map
                 hidden_states = mx.concatenate([latents, static_depth_map], axis=-1)
-
-                # 5.t Predict the noise
                 noise = self.transformer(
                     t=t,
                     config=config,
@@ -103,12 +104,8 @@ class Flux1Depth(nn.Module):
                     prompt_embeds=prompt_embeds,
                     pooled_prompt_embeds=pooled_prompt_embeds,
                 )
-
-                # 6.t Take one denoise step
                 dt = config.sigmas[t + 1] - config.sigmas[t]
                 latents += noise * dt
-
-                # (Optional) Call subscribers in-loop
                 Callbacks.in_loop(
                     t=t,
                     seed=seed,
@@ -116,12 +113,9 @@ class Flux1Depth(nn.Module):
                     latents=latents,
                     config=config,
                     time_steps=time_steps,
-                )  # fmt: off
-
-                # (Optional) Evaluate to enable progress tracking
+                )
                 mx.eval(latents)
-
-            except KeyboardInterrupt:  # noqa: PERF203
+            except KeyboardInterrupt:
                 Callbacks.interruption(
                     t=t,
                     seed=seed,
@@ -131,16 +125,12 @@ class Flux1Depth(nn.Module):
                     time_steps=time_steps,
                 )
                 raise StopImageGenerationException(f"Stopping image generation at step {t + 1}/{len(time_steps)}")
-
-        # (Optional) Call subscribers after loop
         Callbacks.after_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
             config=config,
-        )  # fmt: off
-
-        # 7. Decode the latent array and return the image
+        )
         latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         decoded = self.vae.decode(latents)
         return ImageUtil.to_image(
@@ -148,6 +138,9 @@ class Flux1Depth(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
