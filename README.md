@@ -52,6 +52,7 @@ Run the powerful [FLUX](https://blackforestlabs.ai/#get-flux) models from [Black
 - [🌱‍ Related projects](#-related-projects)
 - [🙏 Acknowledgements](#-acknowledgements)
 - [⚖️ License](#-license)
+- [🧩 Callback Functions](#-callback-functions)
 
 <!-- TOC end -->
 
@@ -134,6 +135,8 @@ pip install -U mflux
 </details>
 
 *If you have trouble installing MFLUX, please see the [installation related issues section](https://github.com/filipstrand/mflux/issues?q=is%3Aissue+install+).* 
+
+> ⚠️ **TODO:** Rewrite this the code to handle the extra Dual Prompt Parameters.
 
 ### 🖼️ Generating an image
 
@@ -227,6 +230,8 @@ MFLUX now supports **dual prompts** for advanced users who want to control the C
 - The T5 prompt generally has a stronger influence on the generated image than the CLIP prompt.
 - You can experiment by leaving one prompt empty to see the effect of each encoder.
 
+> ⚠️ **TODO:** Rewrite this the code to handle the extra Dual Prompt Parameters.
+
 **Example:**
 ```sh
 mflux-generate \
@@ -313,60 +318,67 @@ See the [Controlnet](#%EF%B8%8F-controlnet) section for more details on how to u
 
 #### Config schema
 
+> ⚠️ **TODO:** Rewrite this the code to handle the extra Dual Prompt Parameters.
+
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "seed": {
-      "type": ["integer", "null"]
-    },
-    "steps": {
-      "type": ["integer", "null"]
-    },
-    "guidance": {
-      "type": ["number", "null"]
-    },
-    "quantize": {
-      "type": ["null", "string"]
-    },
-    "lora_paths": {
-      "type": ["array", "null"],
-      "items": {
-        "type": "string"
-      }
-    },
-    "lora_scales": {
-      "type": ["array", "null"],
-      "items": {
-        "type": "number"
-      }
-    },
-    "prompt": {
-      "type": ["string", "null"]
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "seed": {
+            "type": ["integer", "null"]
+        },
+        "steps": {
+            "type": ["integer", "null"]
+        },
+        "guidance": {
+            "type": ["number", "null"]
+        },
+        "quantize": {
+            "type": ["null", "string"]
+        },
+        "lora_paths": {
+            "type": ["array", "null"],
+            "items": {
+                "type": "string"
+            }
+        },
+        "lora_scales": {
+            "type": ["array", "null"],
+            "items": {
+                "type": "number"
+          }
+        },
+        "prompt": {
+            "type": ["string", "null"]
+        }
+        "dual_prompts": {
+            "type": [bool], False
+        }
     }
-  }
 }
 ```
 
 #### Example
 
+> ⚠️ **TODO:** Rewrite this the code to handle the extra Dual Prompt Parameters.
+
 ```json
 {
-  "model": "dev",
-  "seed": 42,
-  "steps": 8,
-  "guidance": 3.0,
-  "quantize": 4,
-  "lora_paths": [
-    "/some/path1/to/subject.safetensors",
-    "/some/path2/to/style.safetensors"
-  ],
-  "lora_scales": [
-    0.8,
-    0.4
-  ],
-  "prompt": "award winning modern art, MOMA"
+    "model": "dev",
+    "seed": 42,
+    "steps": 8,
+    "guidance": 3.0,
+    "quantize": 4,
+    "lora_paths": [
+        "/some/path1/to/subject.safetensors",
+        "/some/path2/to/style.safetensors"
+    ],
+    "lora_scales": [
+        0.8,
+        0.4
+    ],
+    "prompt": "award winning modern art, MOMA"
 }
 ```
 </details>
@@ -378,19 +390,24 @@ from mflux import Flux1, Config
 
 # Load the model
 flux = Flux1.from_name(
-   model_name="schnell",  # "schnell" or "dev"
-   quantize=8,            # 4 or 8
+    model_name="schnell",  # "schnell" or "dev"
+    quantize=8,            # 4 or 8
 )
+
+> ⚠️ **TODO:** Rewrite this the code to handle the extra Dual Prompt Parameters.
 
 # Generate an image
 image = flux.generate_image(
-   seed=2,
-   prompt="Luxury food photograph",
-   config=Config(
-      num_inference_steps=2,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
-      height=1024,
-      width=1024,
-   )
+    seed=2,
+    prompt="Luxury food photograph",
+    config=Config(
+       num_inference_steps=2,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
+       height=1024,
+       width=1024,
+    )
+    dual_prompt: bool = False,
+    clip_prompt: str = None,
+    t5_prompt: str = None,
 )
 
 image.save(path="image.png")
@@ -410,7 +427,7 @@ time mflux-generate \
 --seed 2 \
 --height 1024 \
 --width 1024
-```
+
 
 To find out the spec of your machine (including number of CPU cores, GPU cores, and memory, run the following command:
 ```sh
@@ -1271,5 +1288,46 @@ MFLUX would not be possible without the great work of:
 ### ⚖️ License
 
 This project is licensed under the [MIT License](LICENSE).
+
+### 🧩 Callback Functions
+
+MFLUX provides a flexible callback system that allows you to hook into various stages of the image generation process. Callbacks can be used to save intermediate images, log statistics, optimize memory usage, and more. They are especially useful for advanced users who want to customize or extend the workflow.
+
+**Available Callback Classes:**
+
+- **StepwiseHandler**: Saves intermediate images at each denoising step and creates a composite image. Supports both multi-image and single-image (overwriting) modes via `--stepwise-image-output-dir` and `--stepwise-single-image`.
+- **DepthImageSaver**: Saves the depth map image before the generation loop begins (used with depth-based generation).
+- **CannyImageSaver**: Saves the Canny edge detection image before the generation loop begins (used with ControlNet).
+- **MemorySaver**: Optimizes memory usage by clearing caches and releasing model components at strategic points.
+
+**How to Use Callbacks:**
+
+Callbacks are automatically registered by the CLI tools when you use certain flags (e.g., `--stepwise-image-output-dir`, `--save-depth-map`, `--controlnet-save-canny`, `--low-ram`). You can also register your own callbacks by modifying the code or extending the callback registry.
+
+**Callback Triggers:**
+- `call_before_loop`: Runs before the main generation loop (e.g., to save initial images or set up state).
+- `call_in_loop`: Runs at each step of the generation loop (e.g., to save stepwise images).
+- `call_after_loop`: Runs after the generation loop completes.
+- `call_interrupt`: Runs if the generation is interrupted (e.g., by Ctrl+C).
+
+**Dual Prompt and Backward Compatibility:**
+
+All built-in callbacks now support the new dual prompt arguments:
+- `dual_prompt` (bool): Whether dual prompt mode is active
+- `clip_prompt` (str or None): The CLIP encoder prompt
+- `t5_prompt` (str or None): The T5 encoder prompt
+
+For backward compatibility, callbacks accept both the old single `prompt` argument and the new dual prompt arguments via `**kwargs`. If dual prompt mode is not enabled, they fall back to using the single prompt. This ensures that older scripts and third-party callbacks continue to work without modification.
+
+**Example (custom callback signature):**
+```python
+def call_in_loop(self, t, seed, prompt=None, latents=None, config=None, time_steps=None, **kwargs):
+    clip_prompt = kwargs.get('clip_prompt', None)
+    t5_prompt = kwargs.get('t5_prompt', None)
+    dual_prompt = kwargs.get('dual_prompt', False)
+    # Use whichever prompt(s) are provided
+```
+
+You can create your own callbacks by subclassing the appropriate base class and registering them with the callback registry.
 
 

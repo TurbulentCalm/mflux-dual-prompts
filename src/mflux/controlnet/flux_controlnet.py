@@ -71,25 +71,16 @@ class Flux1Controlnet(nn.Module):
             height=config.height,
             width=config.width,
         )
-        if dual_prompt:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
-                clip_prompt=clip_prompt,
-                t5_prompt=t5_prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
-        else:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-                prompt=prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
+        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompts(
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
+            prompt_cache=self.prompt_cache,
+            t5_tokenizer=self.t5_tokenizer,
+            clip_tokenizer=self.clip_tokenizer,
+            t5_text_encoder=self.t5_text_encoder,
+            clip_text_encoder=self.clip_text_encoder,
+        )
+        # *** CODE REVIEW DUAL PROMPTS
         Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
@@ -118,6 +109,7 @@ class Flux1Controlnet(nn.Module):
                 )
                 dt = config.sigmas[t + 1] - config.sigmas[t]
                 latents += noise * dt
+                # *** CODE REVIEW DUAL PROMPTS
                 Callbacks.in_loop(
                     t=t,
                     seed=seed,
@@ -127,7 +119,8 @@ class Flux1Controlnet(nn.Module):
                     time_steps=time_steps,
                 )
                 mx.eval(latents)
-            except KeyboardInterrupt:
+            except KeyboardInterrupt
+                # *** CODE REVIEW DUAL PROMPTS:
                 Callbacks.interruption(
                     t=t,
                     seed=seed,
@@ -137,6 +130,7 @@ class Flux1Controlnet(nn.Module):
                     time_steps=time_steps,
                 )
                 raise StopImageGenerationException(f"Stopping image generation at step {t + 1}/{len(time_steps)}")
+        # *** CODE REVIEW DUAL PROMPTS
         Callbacks.after_loop(
             seed=seed,
             prompt=prompt,
@@ -150,14 +144,14 @@ class Flux1Controlnet(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
             controlnet_image_path=controlnet_image_path,
             generation_time=time_steps.format_dict["elapsed"],
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
 
     def save_model(self, base_path: str) -> None:

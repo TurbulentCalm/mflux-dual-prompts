@@ -1,3 +1,4 @@
+from mflux.utils.prompt_utils import normalize_dual_prompts
 from typing import Protocol
 
 import mlx.core as mx
@@ -7,7 +8,7 @@ import tqdm
 from mflux.config.runtime_config import RuntimeConfig
 
 
-) -> None: ...class BeforeLoopCallback(Protocol):
+class BeforeLoopCallback(Protocol):
     def call_before_loop(
         self,
         seed: int,

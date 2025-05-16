@@ -66,26 +66,17 @@ class Flux1(nn.Module):
                 init_time_step=config.init_time_step,
             ),
         )
-        if dual_prompt:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
-                clip_prompt=clip_prompt,
-                t5_prompt=t5_prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
-        else:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-                prompt=prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
-        Callbacks.before_loop(
+        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompts(
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
+            prompt_cache=self.prompt_cache,
+            t5_tokenizer=self.t5_tokenizer,
+            clip_tokenizer=self.clip_tokenizer,
+            t5_text_encoder=self.t5_text_encoder,
+            clip_text_encoder=self.clip_text_encoder,
+        )
+            # *** CODE REVIEW DUAL PROMPTS
+            Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
@@ -102,6 +93,7 @@ class Flux1(nn.Module):
                 )
                 dt = config.sigmas[t + 1] - config.sigmas[t]
                 latents += noise * dt
+                # *** REVIEW CODE DUAL PROMPTS
                 Callbacks.in_loop(
                     t=t,
                     seed=seed,
@@ -112,6 +104,7 @@ class Flux1(nn.Module):
                 )
                 mx.eval(latents)
             except KeyboardInterrupt:
+                # *** REVIEW CODE DUAL PROMPTS
                 Callbacks.interruption(
                     t=t,
                     seed=seed,
@@ -121,7 +114,8 @@ class Flux1(nn.Module):
                     time_steps=time_steps,
                 )
                 raise StopImageGenerationException(f"Stopping image generation at step {t + 1}/{len(time_steps)}")
-        Callbacks.after_loop(
+                # *** REVIEW CODE DUAL PROMPTS
+                Callbacks.after_loop(
             seed=seed,
             prompt=prompt,
             latents=latents,
@@ -134,15 +128,15 @@ class Flux1(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
             image_path=config.image_path,
             image_strength=config.image_strength,
             generation_time=time_steps.format_dict["elapsed"],
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
 
     @staticmethod

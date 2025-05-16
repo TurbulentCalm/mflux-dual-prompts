@@ -66,31 +66,21 @@ class Flux1InContextLoRA(nn.Module):
         )
         static_noise = Flux1InContextLoRA._create_in_context_latents(seed=seed, config=config)
         latents = mx.array(static_noise)
-        if dual_prompt:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
-                clip_prompt=clip_prompt,
-                t5_prompt=t5_prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
-        else:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-                prompt=prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
+        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompts(
+            prompt=prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
+            dual_prompt=dual_prompt,
+            prompt_cache=self.prompt_cache,
+            t5_tokenizer=self.t5_tokenizer,
+            clip_tokenizer=self.clip_tokenizer,
+            t5_text_encoder=self.t5_text_encoder,
+            clip_text_encoder=self.clip_text_encoder,
+        )
+        # *** CODE REVIEW DUAL PROMPTS
         Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             latents=latents,
             config=config,
         )
@@ -112,37 +102,31 @@ class Flux1InContextLoRA(nn.Module):
                     encoded_image=encoded_image,
                     static_noise=static_noise,
                 )
+                # *** CODE REVIEW DUAL PROMPTS
                 Callbacks.in_loop(
                     t=t,
                     seed=seed,
                     prompt=prompt,
-                    dual_prompt=dual_prompt,
-                    clip_prompt=clip_prompt,
-                    t5_prompt=t5_prompt,
                     latents=latents,
                     config=config,
                     time_steps=time_steps,
                 )
                 mx.eval(latents)
             except KeyboardInterrupt:
+                # *** CODE REVIEW DUAL PROMPTS
                 Callbacks.interruption(
                     t=t,
                     seed=seed,
                     prompt=prompt,
-                    dual_prompt=dual_prompt,
-                    clip_prompt=clip_prompt,
-                    t5_prompt=t5_prompt,
                     latents=latents,
                     config=config,
                     time_steps=time_steps,
                 )
                 raise StopImageGenerationException(f"Stopping image generation at step {t + 1}/{len(time_steps)}")
+        # *** CODE REVIEW DUAL PROMPTS
         Callbacks.after_loop(
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             latents=latents,
             config=config,
         )
@@ -153,15 +137,15 @@ class Flux1InContextLoRA(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
             image_path=config.image_path,
             image_strength=config.image_strength,
             generation_time=time_steps.format_dict["elapsed"],
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
 
     @staticmethod

@@ -16,12 +16,19 @@ class CannyImageSaver(BeforeLoopCallback):
     def call_before_loop(
         self,
         seed: int,
-        prompt: str,
-        latents: mx.array,
-        config: RuntimeConfig,
+        prompt: str = None,
+        latents: mx.array = None,
+        config: RuntimeConfig = None,
         canny_image: PIL.Image.Image | None = None,
         depth_image: PIL.Image.Image | None = None,
+        **kwargs,
     ) -> None:
+        clip_prompt = kwargs.get('clip_prompt', None)
+        t5_prompt = kwargs.get('t5_prompt', None)
+        dual_prompt = kwargs.get('dual_prompt', False)
+        used_prompt = prompt
+        if dual_prompt:
+            used_prompt = f"CLIP: {clip_prompt or ''} | T5: {t5_prompt or ''}"
         base, ext = os.path.splitext(self.path)
         ImageUtil.save_image(
             image=canny_image,

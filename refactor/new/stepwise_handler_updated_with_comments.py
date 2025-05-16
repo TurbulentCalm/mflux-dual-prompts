@@ -27,10 +27,10 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def call_before_loop(
+    def call_
         self,
         seed: int,
-        prompt: str = None,
+        prompt: str | None = None,
         latents: mx.array = None,
         config: RuntimeConfig = None,
         canny_image: PIL.Image.Image | None = None,
@@ -239,3 +239,7 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
             log.error(f"Error saving composite image: {e}")
             import traceback
             log.error(f"Traceback: {traceback.format_exc()}")
+
+
+# --- Removed lines preserved for review ---
+#     def call_before_loop(

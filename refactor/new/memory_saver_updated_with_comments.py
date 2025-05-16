@@ -22,10 +22,10 @@ class MemorySaver(BeforeLoopCallback, InLoopCallback, AfterLoopCallback):
         mx.clear_cache()
         mx.reset_peak_memory()
 
-    def call_before_loop(
+    def call_
         self,
         seed: int,
-        prompt: str = None,
+        prompt: str | None = None,
         latents: mx.array = None,
         config: RuntimeConfig = None,
         canny_image: PIL.Image.Image | None = None,
@@ -76,3 +76,7 @@ class MemorySaver(BeforeLoopCallback, InLoopCallback, AfterLoopCallback):
     def memory_stats(self) -> str:
         self.peak_memory = mx.get_peak_memory()
         return f"Peak MLX memory: {self.peak_memory / 10**9:.2f} GB"
+
+
+# --- Removed lines preserved for review ---
+#     def call_before_loop(

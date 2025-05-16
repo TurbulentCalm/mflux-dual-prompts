@@ -1,3 +1,4 @@
+from mflux.utils.prompt_utils import normalize_dual_prompts
 import gc
 
 import mlx.core as mx

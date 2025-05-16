@@ -7,7 +7,7 @@ import tqdm
 from mflux.config.runtime_config import RuntimeConfig
 
 
-) -> None: ...class BeforeLoopCallback(Protocol):
+class BeforeLoopCallback(Protocol):
     def call_before_loop(
         self,
         seed: int,

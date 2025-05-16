@@ -130,15 +130,15 @@ class Flux1Redux(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
             redux_image_paths=config.redux_image_paths,
             image_strength=config.image_strength,
             generation_time=time_steps.format_dict["elapsed"],
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
 
     @staticmethod
@@ -156,25 +156,15 @@ class Flux1Redux(nn.Module):
         image_encoder: SiglipVisionTransformer = None,
         image_embedder: ReduxEncoder = None,
     ) -> tuple[mx.array, mx.array]:
-        if dual_prompt:
-            prompt_embeds_txt, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
-                clip_prompt=clip_prompt,
-                t5_prompt=t5_prompt,
-                prompt_cache=prompt_cache,
-                t5_tokenizer=t5_tokenizer,
-                clip_tokenizer=clip_tokenizer,
-                t5_text_encoder=t5_text_encoder,
-                clip_text_encoder=clip_text_encoder,
-            )
-        else:
-            prompt_embeds_txt, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-                prompt=prompt,
-                prompt_cache=prompt_cache,
-                t5_tokenizer=t5_tokenizer,
-                clip_tokenizer=clip_tokenizer,
-                t5_text_encoder=t5_text_encoder,
-                clip_text_encoder=clip_text_encoder,
-            )
+        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompts(
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
+            prompt_cache=self.prompt_cache,
+            t5_tokenizer=self.t5_tokenizer,
+            clip_tokenizer=self.clip_tokenizer,
+            t5_text_encoder=self.t5_text_encoder,
+            clip_text_encoder=self.clip_text_encoder,
+        )
         image_embeds = ReduxUtil.embed_images(
             image_paths=image_paths,
             image_encoder=image_encoder,

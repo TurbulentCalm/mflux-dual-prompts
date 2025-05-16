@@ -61,25 +61,15 @@ class Flux1Depth(nn.Module):
             height=config.height,
             width=config.width,
         )
-        if dual_prompt:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_dual_prompts(
-                clip_prompt=clip_prompt,
-                t5_prompt=t5_prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
-        else:
-            prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompt(
-                prompt=prompt,
-                prompt_cache=self.prompt_cache,
-                t5_tokenizer=self.t5_tokenizer,
-                clip_tokenizer=self.clip_tokenizer,
-                t5_text_encoder=self.t5_text_encoder,
-                clip_text_encoder=self.clip_text_encoder,
-            )
+        prompt_embeds, pooled_prompt_embeds = PromptEncoder.encode_prompts(
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
+            prompt_cache=self.prompt_cache,
+            t5_tokenizer=self.t5_tokenizer,
+            clip_tokenizer=self.clip_tokenizer,
+            t5_text_encoder=self.t5_text_encoder,
+            clip_text_encoder=self.clip_text_encoder,
+        )
         static_depth_map, depth_image = DepthUtil.encode_depth_map(
             vae=self.vae,
             depth_pro=self.depth_pro,
@@ -87,6 +77,7 @@ class Flux1Depth(nn.Module):
             image_path=config.image_path,
             depth_image_path=config.depth_image_path,
         )
+        # *** CODE REVIEW DUAL PROMPTS
         Callbacks.before_loop(
             seed=seed,
             prompt=prompt,
@@ -138,13 +129,13 @@ class Flux1Depth(nn.Module):
             config=config,
             seed=seed,
             prompt=prompt,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             quantization=self.bits,
             lora_paths=self.lora_paths,
             lora_scales=self.lora_scales,
             image_path=config.image_path,
             depth_image_path=config.depth_image_path,
             generation_time=time_steps.format_dict["elapsed"],
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )

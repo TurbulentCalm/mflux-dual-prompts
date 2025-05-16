@@ -7,11 +7,11 @@ import tqdm
 from mflux.config.runtime_config import RuntimeConfig
 
 
-) -> None: ...class BeforeLoopCallback(Protocol):
+class BeforeLoopCallback(Protocol):
     def call_before_loop(
         self,
         seed: int,
-        prompt: str,
+        prompt: str | None = None, dual_prompt: bool = False, clip_prompt: str | None = None, t5_prompt: str | None = None,
         latents: mx.array,
         config: RuntimeConfig,
         canny_image: PIL.Image.Image | None = None,
@@ -24,7 +24,7 @@ class InLoopCallback(Protocol):
         self,
         t: int,
         seed: int,
-        prompt: str,
+        prompt: str | None = None, dual_prompt: bool = False, clip_prompt: str | None = None, t5_prompt: str | None = None,
         latents: mx.array,
         config: RuntimeConfig,
         time_steps: tqdm,
@@ -35,7 +35,7 @@ class AfterLoopCallback(Protocol):
     def call_after_loop(
         self,
         seed: int,
-        prompt: str,
+        prompt: str | None = None, dual_prompt: bool = False, clip_prompt: str | None = None, t5_prompt: str | None = None,
         latents: mx.array,
         config: RuntimeConfig,
     ) -> None: ...

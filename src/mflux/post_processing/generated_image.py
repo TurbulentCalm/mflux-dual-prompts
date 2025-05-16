@@ -30,8 +30,8 @@ class GeneratedImage:
         depth_image_path: str | Path | None = None,
         redux_image_paths: list[str] | list[Path] | None = None,
         dual_prompt: bool = False,
-        clip_prompt: str = None,
-        t5_prompt: str = None,
+        clip_prompt: str | None = None,
+        t5_prompt: str | None = None,
     ):
         self.image = image
         self.model_config = model_config
@@ -52,9 +52,8 @@ class GeneratedImage:
         self.depth_image_path = depth_image_path
         self.redux_image_paths = redux_image_paths
         self.dual_prompt = dual_prompt
-        self.clip_prompt = clip_prompt
-        self.t5_prompt = t5_prompt
-
+        self.clip_prompt, self.t5_prompt = normalize_dual_prompts(prompt, clip_prompt, t5_prompt, dual_prompt)
+            
     def get_right_half(self) -> "GeneratedImage":
         # Calculate the coordinates for the right half
         width, height = self.image.size
@@ -79,6 +78,10 @@ class GeneratedImage:
             image_strength=self.image_strength,
             masked_image_path=self.masked_image_path,
             depth_image_path=self.depth_image_path,
+            redux_image_paths=self.redux_image_paths,
+            dual_prompt= self.dual_prompt,
+            clip_prompt=self.clip_prompt,
+            t5_prompt=self.t5_prompt,
         )
 
     def save(
@@ -115,8 +118,11 @@ class GeneratedImage:
             "controlnet_strength": round(self.controlnet_strength, 2) if self.controlnet_strength else None,
             "masked_image_path": str(self.masked_image_path) if self.masked_image_path else None,
             "depth_image_path": str(self.depth_image_path) if self.depth_image_path else None,
-            "redux_image_paths": str(self.redux_image_paths) if self.redux_image_paths else None,
+            "redux_image_paths": [str(p) for p in self.redux_image_paths] if self.redux_image_paths else None,
             "prompt": self.prompt,
+            "dual_prompts": self.dual_prompt,
+            "clip_prompt": self.clip_prompt,
+            "t5_prompt": self.t5_prompt,
         }
 
     @staticmethod

@@ -21,47 +21,76 @@ class ImageUtil:
         decoded_latents: mx.array,
         config: RuntimeConfig,
         seed: int,
-        prompt: str,
-        quantization: int,
-        generation_time: float,
-        lora_paths: list[str],
-        lora_scales: list[float],
+        dual_prompts: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
+        prompt: str = None,
+        quantization: int = None,
+        generation_time: float = None,
+        lora_paths: list[str] = None,
+        lora_scales: list[float] = None,
         controlnet_image_path: str | Path | None = None,
+        controlnet_strength: float | None = None,
         image_path: str | Path | None = None,
-        redux_image_paths: list[str] | list[Path] | None = None,
         image_strength: float | None = None,
         masked_image_path: str | Path | None = None,
         depth_image_path: str | Path | None = None,
-        dual_prompt: bool = False,
-        clip_prompt: str = None,
-        t5_prompt: str = None,
+        redux_image_paths: list[str] | list[Path] | None = None,
     ) -> GeneratedImage:
+        log.info("Starting to_image conversion")
+        
+        log.info("Denormalizing decoded latents...")
         normalized = ImageUtil._denormalize(decoded_latents)
+        if normalized is None:
+            log.error("Denormalization failed")
+            return None
+            
+        log.info("Converting to numpy array...")
         normalized_numpy = ImageUtil._to_numpy(normalized)
+        if normalized_numpy is None:
+            log.error("Numpy conversion failed")
+            return None
+            
+        log.info("Converting to PIL image...")
         image = ImageUtil._numpy_to_pil(normalized_numpy)
-        return GeneratedImage(
+        if image is None:
+            log.error("PIL conversion failed")
+            return None
+            
+        log.info("Creating GeneratedImage object...")
+        generated_image = GeneratedImage(
             image=image,
             model_config=config.model_config,
             seed=seed,
-            steps=config.num_inference_steps,
+            dual_prompt=dual_prompt,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
             prompt=prompt,
+            steps=config.num_inference_steps,
             guidance=config.guidance,
             precision=config.precision,
             quantization=quantization,
             generation_time=generation_time,
             lora_paths=lora_paths,
             lora_scales=lora_scales,
+            controlnet_image_path=controlnet_image_path,
+            controlnet_strength=controlnet_strength,
             image_path=image_path,
             image_strength=image_strength,
-            controlnet_image_path=controlnet_image_path,
-            controlnet_strength=config.controlnet_strength,
             masked_image_path=masked_image_path,
             depth_image_path=depth_image_path,
             redux_image_paths=redux_image_paths,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
         )
+        
+        if generated_image is None:
+            log.error("Failed to create GeneratedImage object")
+            return None
+        if generated_image.image is None:
+            log.error("GeneratedImage created but has None image attribute")
+            return None
+            
+        log.info("Image conversion completed successfully")
+        return generated_image
 
     @staticmethod
     def to_composite_image(generated_images: list[GeneratedImage]) -> PIL.Image.Image:
@@ -89,16 +118,28 @@ class ImageUtil:
 
     @staticmethod
     def _to_numpy(images: mx.array) -> np.ndarray:
-        images = mx.transpose(images, (0, 2, 3, 1))
-        images = mx.array.astype(images, mx.float32)
-        images = np.array(images)
-        return images
+        try:
+            log.info(f"Converting MLX array of shape {images.shape} to numpy")
+            images = mx.transpose(images, (0, 2, 3, 1))
+            images = mx.array.astype(images, mx.float32)
+            images = np.array(images)
+            log.info(f"Converted to numpy array of shape {images.shape}")
+            return images
+        except Exception as e:
+            log.error(f"Error converting to numpy: {e}")
+            return None
 
     @staticmethod
     def _numpy_to_pil(images: np.ndarray) -> PIL.Image.Image:
-        images = (images * 255).round().astype("uint8")
-        pil_images = [PIL.Image.fromarray(image) for image in images]
-        return pil_images[0]
+        try:
+            log.info(f"Converting numpy array of shape {images.shape} to PIL")
+            images = (images * 255).round().astype("uint8")
+            pil_images = [PIL.Image.fromarray(image) for image in images]
+            log.info(f"Converted to PIL image of size {pil_images[0].size}")
+            return pil_images[0]
+        except Exception as e:
+            log.error(f"Error converting to PIL: {e}")
+            return None
 
     @staticmethod
     def _pil_to_numpy(image: PIL.Image.Image) -> np.ndarray:
@@ -229,6 +270,7 @@ class ImageUtil:
 
         try:
             # Save image without metadata first
+            log.info(f"About to call image.save [DEBUG-TRACE] | image: {image}, type: {type(image)}, path: {file_path}")
             image.save(file_path)
             log.info(f"Image saved successfully at: {file_path}")
 
@@ -242,7 +284,7 @@ class ImageUtil:
                 ImageUtil._embed_metadata(metadata, file_path)
                 log.info(f"Metadata embedded successfully at: {file_path}")
         except Exception as e:  # noqa: BLE001
-            log.error(f"Error saving image: {e}")
+            log.error(f"Error saving image: {e} [DEBUG-TRACE]")
 
     @staticmethod
     def _embed_metadata(metadata: dict, path: str | Path) -> None:

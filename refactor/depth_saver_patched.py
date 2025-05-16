@@ -1,3 +1,4 @@
+from mflux.utils.prompt_utils import normalize_dual_prompts
 import os
 from pathlib import Path
 

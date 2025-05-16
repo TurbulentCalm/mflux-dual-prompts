@@ -55,6 +55,7 @@ class DreamBooth:
 
             # Generate a test image from the model periodically
             if training_state.should_generate_image(training_spec):
+                # *** CODE REVIEW DUAL PROMPTS
                 image = flux.generate_image(
                     seed=training_spec.seed,
                     config=runtime_config.config,

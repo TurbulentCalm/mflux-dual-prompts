@@ -88,6 +88,7 @@ class CommandLineParser(argparse.ArgumentParser):
         self.add_argument("--image-strength", type=float, required=False, default=ui_defaults.IMAGE_STRENGTH, help=f"Controls how strongly the init image influences the output image. A value of 0.0 means no influence. (Default is {ui_defaults.IMAGE_STRENGTH})")
 
     def add_batch_image_generator_arguments(self) -> None:
+        # *** REVIEW REQUIRED
         self.add_argument("--prompts-file", type=Path, required=True, default=argparse.SUPPRESS, help="Local path for a file that holds a batch of prompts.")
         self.add_argument("--global-seed", type=int, default=argparse.SUPPRESS, help="Entropy Seed (used for all prompts in the batch)")
         self._add_image_generator_common_arguments()
@@ -224,16 +225,23 @@ class CommandLineParser(argparse.ArgumentParser):
             output_path = Path(namespace.output)
             namespace.output = str(output_path.with_stem(output_path.stem + "_seed_{seed}"))
 
-        # Dual prompt validation
-        if getattr(namespace, "dual_prompts", False):
-            # Accept None, empty string, or whitespace as 'not provided'
-            clip_val = (namespace.clip_prompt or "").strip()
-            t5_val = (namespace.t5_prompt or "").strip()
-            if not (clip_val or t5_val):
-                self.error("In dual prompts mode, at least one of --clip-prompt or --t5-prompt must be provided (non-empty). You may leave one blank, but not both.")
-        else:
-            if not getattr(namespace, "prompt", None):
-                self.error("--prompt argument required or 'prompt' required in metadata config file (or use dual prompts mode with --clip-prompt/--clip_prompt and --t5-prompt/--t5_prompt)")
+        # # Dual prompt validation
+        # if getattr(namespace, "dual_prompts", False):
+        #     print("*** dual prompts")
+        #     # Accept None, empty string, or whitespace as 'not provided'
+        #     clip_val = (namespace.clip_prompt or "").strip()
+        #     t5_val = (namespace.t5_prompt or "").strip()
+        #     print(f"*** clip-prompt: {clip_val}")
+        #     print(f"*** t5-prompt: {t5_val}")
+        #     # if not (clip_val or t5_val):
+        #         # self.error("In dual prompts mode, at least one of --clip-prompt or --t5-prompt must be provided (non-empty). You may leave one blank, but not both.")
+        # else:
+        #     print("*** combined prompt")
+        #     print(f"*** prompt: {prompt_val}")
+        #     prompt_val = (namespace.prompt or "").strip()
+        #     print(f"*** prompt: {prompt_val}")
+        #     if not getattr(namespace, "prompt", None):
+        #         self.error("--prompt argument required or 'prompt' required in metadata config file (or use dual prompts mode with --clip-prompt/--clip_prompt and --t5-prompt/--t5_prompt)")
 
         if self.supports_image_generation and namespace.steps is None:
             namespace.steps = ui_defaults.MODEL_INFERENCE_STEPS.get(namespace.model, 14)
