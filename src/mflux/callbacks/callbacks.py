@@ -15,7 +15,8 @@ class Callbacks:
         config: RuntimeConfig,
         canny_image: PIL.Image.Image | None = None,
         depth_image: PIL.Image.Image | None = None,
-    ):
+        **kwargs,
+):
         for subscriber in CallbackRegistry.before_loop_callbacks():
             subscriber.call_before_loop(
                 seed=seed,
@@ -28,13 +29,14 @@ class Callbacks:
 
     @staticmethod
     def in_loop(
-        t: int,
-        seed: int,
-        prompt: str,
-        latents: mx.array,
-        config: RuntimeConfig,
-        time_steps: tqdm,
-    ):
+    t: int,
+    seed: int,
+    prompt: str,
+    latents: mx.array,
+    config: RuntimeConfig,
+    time_steps: tqdm,
+    **kwargs,
+):
         for subscriber in CallbackRegistry.in_loop_callbacks():
             subscriber.call_in_loop(
                 t=t,
@@ -47,23 +49,25 @@ class Callbacks:
 
     @staticmethod
     def after_loop(
-        seed: int,
-        prompt: str,
-        latents: mx.array,
-        config: RuntimeConfig,
-    ):
+    seed: int,
+    prompt: str,
+    latents: mx.array,
+    config: RuntimeConfig,
+    **kwargs,
+):
         for subscriber in CallbackRegistry.after_loop_callbacks():
             subscriber.call_after_loop(seed=seed, prompt=prompt, latents=latents, config=config)
 
     @staticmethod
     def interruption(
-        t: int,
-        seed: int,
-        prompt: str,
-        latents: mx.array,
-        config: RuntimeConfig,
-        time_steps: tqdm,
-    ):
+    t: int,
+    seed: int,
+    prompt: str,
+    latents: mx.array,
+    config: RuntimeConfig,
+    time_steps: tqdm,
+    **kwargs,
+):
         for subscriber in CallbackRegistry.interrupt_callbacks():
             subscriber.call_interrupt(
                 t=t,

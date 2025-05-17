@@ -27,9 +27,9 @@ class DepthImageSaver(BeforeLoopCallback):
             return
         clip_prompt = kwargs.get('clip_prompt', None)
         t5_prompt = kwargs.get('t5_prompt', None)
-        dual_prompt = kwargs.get('dual_prompt', False)
+        dual_prompts = kwargs.get('dual_prompts', False)
         used_prompt = prompt
-        if dual_prompt:
+        if dual_prompts:
             used_prompt = f"CLIP: {clip_prompt or ''} | T5: {t5_prompt or ''}"
         base, ext = os.path.splitext(self.path)
         ImageUtil.save_image(

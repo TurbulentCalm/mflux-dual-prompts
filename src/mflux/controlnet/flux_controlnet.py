@@ -54,10 +54,10 @@ class Flux1Controlnet(nn.Module):
         prompt: str = None,
         controlnet_image_path: str = None,
         config: Config = None,
-        dual_prompt: bool = False,
+        dual_prompts: bool = False,
         clip_prompt: str = None,
         t5_prompt: str = None,
-    ) -> GeneratedImage:
+    ) -> tuple[GeneratedImage, dict]:
         config = RuntimeConfig(config, self.model_config)
         time_steps = tqdm(range(config.num_inference_steps))
         controlnet_condition, canny_image = ControlnetUtil.encode_image(
@@ -87,6 +87,9 @@ class Flux1Controlnet(nn.Module):
             latents=latents,
             config=config,
             canny_image=canny_image,
+            dual_prompts=dual_prompts,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
         for t in time_steps:
             try:
@@ -117,9 +120,12 @@ class Flux1Controlnet(nn.Module):
                     latents=latents,
                     config=config,
                     time_steps=time_steps,
+                    dual_prompts=dual_prompts,
+                    clip_prompt=clip_prompt,
+                    t5_prompt=t5_prompt,
                 )
                 mx.eval(latents)
-            except KeyboardInterrupt
+            except KeyboardInterrupt:
                 # *** CODE REVIEW DUAL PROMPTS:
                 Callbacks.interruption(
                     t=t,
@@ -136,10 +142,13 @@ class Flux1Controlnet(nn.Module):
             prompt=prompt,
             latents=latents,
             config=config,
+            dual_prompts=dual_prompts,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
         latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         decoded = self.vae.decode(latents)
-        return ImageUtil.to_image(
+        generated_image = ImageUtil.to_image(
             decoded_latents=decoded,
             config=config,
             seed=seed,
@@ -149,10 +158,11 @@ class Flux1Controlnet(nn.Module):
             lora_scales=self.lora_scales,
             controlnet_image_path=controlnet_image_path,
             generation_time=time_steps.format_dict["elapsed"],
-            dual_prompt=dual_prompt,
+            dual_prompts=dual_prompts,
             clip_prompt=clip_prompt,
             t5_prompt=t5_prompt,
         )
+        return generated_image, {'canny_image': canny_image}
 
     def save_model(self, base_path: str) -> None:
         ModelSaver.save_model(self, self.bits, base_path)

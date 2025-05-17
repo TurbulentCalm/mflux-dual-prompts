@@ -48,10 +48,10 @@ class Flux1Fill(nn.Module):
         seed: int,
         prompt: str = None,
         config: Config = None,
-        dual_prompt: bool = False,
+        dual_prompts: bool = False,
         clip_prompt: str = None,
         t5_prompt: str = None,
-    ) -> GeneratedImage:
+    ) -> tuple[GeneratedImage, dict, RuntimeConfig]:
         config = RuntimeConfig(config, self.model_config)
         time_steps = tqdm(range(config.init_time_step, config.num_inference_steps))
         latents = LatentCreator.create(
@@ -121,7 +121,7 @@ class Flux1Fill(nn.Module):
         )
         latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         decoded = self.vae.decode(latents)
-        return ImageUtil.to_image(
+        generated_image = ImageUtil.to_image(
             decoded_latents=decoded,
             config=config,
             seed=seed,
@@ -133,7 +133,8 @@ class Flux1Fill(nn.Module):
             image_strength=config.image_strength,
             masked_image_path=config.masked_image_path,
             generation_time=time_steps.format_dict["elapsed"],
-            dual_prompt=dual_prompt,
+            dual_prompts=dual_prompts,
             clip_prompt=clip_prompt,
             t5_prompt=t5_prompt,
         )
+        return generated_image, {'latents': latents}, config

@@ -9,7 +9,6 @@ import PIL.Image
 import PIL.ImageDraw
 
 from mflux.config.runtime_config import RuntimeConfig
-from mflux.post_processing.generated_image import GeneratedImage
 from mflux.ui.box_values import AbsoluteBoxValues, BoxValues
 
 log = logging.getLogger(__name__)
@@ -21,9 +20,6 @@ class ImageUtil:
         decoded_latents: mx.array,
         config: RuntimeConfig,
         seed: int,
-        dual_prompts: bool = False,
-        clip_prompt: str = None,
-        t5_prompt: str = None,
         prompt: str = None,
         quantization: int = None,
         generation_time: float = None,
@@ -36,7 +32,11 @@ class ImageUtil:
         masked_image_path: str | Path | None = None,
         depth_image_path: str | Path | None = None,
         redux_image_paths: list[str] | list[Path] | None = None,
-    ) -> GeneratedImage:
+        dual_prompts: bool = False,
+        clip_prompt: str = None,
+        t5_prompt: str = None,
+    ) -> 'GeneratedImage':
+        from mflux.post_processing.generated_image import GeneratedImage
         log.info("Starting to_image conversion")
         
         log.info("Denormalizing decoded latents...")
@@ -62,9 +62,6 @@ class ImageUtil:
             image=image,
             model_config=config.model_config,
             seed=seed,
-            dual_prompt=dual_prompt,
-            clip_prompt=clip_prompt,
-            t5_prompt=t5_prompt,
             prompt=prompt,
             steps=config.num_inference_steps,
             guidance=config.guidance,
@@ -80,6 +77,9 @@ class ImageUtil:
             masked_image_path=masked_image_path,
             depth_image_path=depth_image_path,
             redux_image_paths=redux_image_paths,
+            dual_prompts=dual_prompts,
+            clip_prompt=clip_prompt,
+            t5_prompt=t5_prompt,
         )
         
         if generated_image is None:
@@ -93,7 +93,8 @@ class ImageUtil:
         return generated_image
 
     @staticmethod
-    def to_composite_image(generated_images: list[GeneratedImage]) -> PIL.Image.Image:
+    def to_composite_image(generated_images: list['GeneratedImage']) -> PIL.Image.Image:
+        from mflux.post_processing.generated_image import GeneratedImage
         # stitch horizontally
         total_width = sum(gen_img.image.width for gen_img in generated_images)
         max_height = max(gen_img.image.height for gen_img in generated_images)

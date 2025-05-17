@@ -5,6 +5,8 @@ import mlx.core as mx
 import PIL.Image
 import toml
 
+from mflux.utils.prompt_utils import normalize_dual_prompts
+from mflux.post_processing.image_util import ImageUtil
 from mflux.config.model_config import ModelConfig
 
 
@@ -29,7 +31,7 @@ class GeneratedImage:
         masked_image_path: str | Path | None = None,
         depth_image_path: str | Path | None = None,
         redux_image_paths: list[str] | list[Path] | None = None,
-        dual_prompt: bool = False,
+        dual_prompts: bool = False,
         clip_prompt: str | None = None,
         t5_prompt: str | None = None,
     ):
@@ -51,9 +53,17 @@ class GeneratedImage:
         self.masked_image_path = masked_image_path
         self.depth_image_path = depth_image_path
         self.redux_image_paths = redux_image_paths
-        self.dual_prompt = dual_prompt
-        self.clip_prompt, self.t5_prompt = normalize_dual_prompts(prompt, clip_prompt, t5_prompt, dual_prompt)
-            
+        self.dual_prompts = dual_prompts
+        self.clip_prompt = clip_prompt
+        self.t5_prompt = t5_prompt
+        
+        clip_prompt, t5_prompt = normalize_dual_prompts(
+            dual_prompts,
+            prompt,
+            clip_prompt,
+            t5_prompt,
+        )        
+
     def get_right_half(self) -> "GeneratedImage":
         # Calculate the coordinates for the right half
         width, height = self.image.size
@@ -79,7 +89,7 @@ class GeneratedImage:
             masked_image_path=self.masked_image_path,
             depth_image_path=self.depth_image_path,
             redux_image_paths=self.redux_image_paths,
-            dual_prompt= self.dual_prompt,
+            dual_prompts= self.dual_prompts,
             clip_prompt=self.clip_prompt,
             t5_prompt=self.t5_prompt,
         )
@@ -90,7 +100,6 @@ class GeneratedImage:
         export_json_metadata: bool = False,
         overwrite: bool = False,
     ) -> None:
-        from mflux import ImageUtil
 
         ImageUtil.save_image(self.image, path, self._get_metadata(), export_json_metadata, overwrite)
 
@@ -120,7 +129,7 @@ class GeneratedImage:
             "depth_image_path": str(self.depth_image_path) if self.depth_image_path else None,
             "redux_image_paths": [str(p) for p in self.redux_image_paths] if self.redux_image_paths else None,
             "prompt": self.prompt,
-            "dual_prompts": self.dual_prompt,
+            "dual_prompts": self.dual_prompts,
             "clip_prompt": self.clip_prompt,
             "t5_prompt": self.t5_prompt,
         }

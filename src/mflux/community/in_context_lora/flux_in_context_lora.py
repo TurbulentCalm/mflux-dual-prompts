@@ -52,10 +52,10 @@ class Flux1InContextLoRA(nn.Module):
         seed: int,
         prompt: str = None,
         config: Config = None,
-        dual_prompt: bool = False,
+        dual_prompts: bool = False,
         clip_prompt: str = None,
         t5_prompt: str = None,
-    ) -> GeneratedImage:
+    ) -> tuple[GeneratedImage, dict]:
         config = RuntimeConfig(config, self.model_config)
         time_steps = tqdm(range(config.init_time_step, config.num_inference_steps))
         encoded_image = LatentCreator.encode_image(
@@ -70,7 +70,7 @@ class Flux1InContextLoRA(nn.Module):
             prompt=prompt,
             clip_prompt=clip_prompt,
             t5_prompt=t5_prompt,
-            dual_prompt=dual_prompt,
+            dual_prompts=dual_prompts,
             prompt_cache=self.prompt_cache,
             t5_tokenizer=self.t5_tokenizer,
             clip_tokenizer=self.clip_tokenizer,
@@ -132,7 +132,7 @@ class Flux1InContextLoRA(nn.Module):
         )
         latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         decoded = self.vae.decode(latents)
-        return ImageUtil.to_image(
+        generated_image = ImageUtil.to_image(
             decoded_latents=decoded,
             config=config,
             seed=seed,
@@ -143,10 +143,11 @@ class Flux1InContextLoRA(nn.Module):
             image_path=config.image_path,
             image_strength=config.image_strength,
             generation_time=time_steps.format_dict["elapsed"],
-            dual_prompt=dual_prompt,
+            dual_prompts=dual_prompts,
             clip_prompt=clip_prompt,
             t5_prompt=t5_prompt,
         )
+        return generated_image, {}
 
     @staticmethod
     def _create_in_context_latents(seed: int, config: RuntimeConfig):
