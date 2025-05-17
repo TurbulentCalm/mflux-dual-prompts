@@ -56,7 +56,7 @@ class ImageGenerator:
 
         # Core callbacks that are always used
         if args.stepwise_image_output_dir:
-            handler = StepwiseHandler(flux=flux, output_dir=args.stepwise_image_output_dir)
+            handler = StepwiseHandler(flux=flux, output_dir=args.stepwise_image_output_dir, stepwise_single_image=getattr(args, 'stepwise_single_image', False))
             self.callback_registry.register_before_loop(handler)
             self.callback_registry.register_in_loop(handler)
             self.callback_registry.register_interrupt(handler)

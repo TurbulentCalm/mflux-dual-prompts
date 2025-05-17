@@ -112,7 +112,7 @@ class CommandLineParser(argparse.ArgumentParser):
     def add_output_arguments(self) -> None:
         self.add_argument("--metadata", action="store_true", help="Export image metadata as a JSON file.")
         self.add_argument("--output", type=str, default="image.png", help="The filename for the output image. Default is \"image.png\".")
-        self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write step-wise images and their final composite image to. This feature may change in future versions.')
+        self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write stepwise images and their final composite image to. This feature may change in future versions.')
         self.add_argument('--stepwise-single-image', action='store_true', help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, creates a single image file that is updated at each step instead of separate files for each step.')
 
     def add_image_outpaint_arguments(self, required=False) -> None:

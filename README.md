@@ -210,7 +210,7 @@ mflux-generate --model dev --prompt "Luxury food photograph" --steps 25 --seed 2
 
 - **`--lora-repo-id`** (optional, `str`, default: `"ali-vilab/In-Context-LoRA"`): The Hugging Face repository ID for LoRAs.
 
-- **`--stepwise-image-output-dir`** (optional, `str`, default: `None`): [EXPERIMENTAL] Output directory to write step-wise images and their final composite image to. This feature may change in future versions. When specified, MFLUX will save an image for each denoising step, allowing you to visualize the generation process from noise to final image.
+- **`--stepwise-image-output-dir`** (optional, `str`, default: `None`): [EXPERIMENTAL] Output directory to write stepwise images and their final composite image to. This feature may change in future versions. When specified, MFLUX will save an image for each denoising step, allowing you to visualize the generation process from noise to final image.
 
 - **`--stepwise-single-image`** (optional, action='store_true'): [EXPERIMENTAL] When used with `--stepwise-image-output-dir`, creates a single image file that is updated at each step instead of separate files for each step. This allows you to monitor a single file to see the progression of the image generation, which is useful for real-time visualization and when you don't need to preserve intermediate steps.
 

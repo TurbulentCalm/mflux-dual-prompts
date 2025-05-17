@@ -15,10 +15,12 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         self,
         flux,
         output_dir: str,
+        stepwise_single_image: bool = False,
     ):
         self.flux = flux
         self.output_dir = Path(output_dir)
-        self.step_wise_images = []
+        self.stepwise_images = []
+        self.stepwise_single_image = stepwise_single_image
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +73,7 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         time_steps: tqdm,
         **kwargs,
     ) -> None:
-        self._save_composite(seed=seed)
+        self._save_composite()
 
     def _save_image(
         self,
@@ -95,14 +97,22 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
             lora_scales=self.flux.lora_scales,
             generation_time=generation_time,
         )
-        stepwise_img.save(
-            path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
-            export_json_metadata=False,
-        )
-        self.step_wise_images.append(stepwise_img)
-        self._save_composite(seed=seed)
+        if self.stepwise_single_image:
+            stepwise_img.save(
+                path=self.output_dir / "current_step.png",
+                export_json_metadata=False,
+            )
+            self.stepwise_images.append(stepwise_img)
+            self._save_composite()
+        else:
+            stepwise_img.save(
+                path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
+                export_json_metadata=False,
+            )
+            self.stepwise_images.append(stepwise_img)
+            self._save_composite()
 
-    def _save_composite(self, seed: int) -> None:
-        if self.step_wise_images:
-            composite_img = ImageUtil.to_composite_image(self.step_wise_images)
-            composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
+    def _save_composite(self) -> None:
+        if self.stepwise_images:
+            composite_img = ImageUtil.to_composite_image(self.stepwise_images)
+            composite_img.save(self.output_dir / ("composite.png" if self.stepwise_single_image else "composite.png"))
