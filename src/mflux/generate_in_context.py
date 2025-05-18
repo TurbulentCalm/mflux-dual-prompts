@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 from mflux.utils.prompt_utils import normalize_dual_prompts
@@ -45,17 +44,17 @@ def main():
     def save_image(image, seed, args):
         output_path = Path(args.output.format(seed=seed))
         # Save right half (this is the generated image)
-        image.get_right_half().save(path=output_path, export_json_metadata=args.metadata)
+        image.get_right_half().save(path=output_path, export_json_metadata=args.metadata, embed_metadata=getattr(args, 'embed_metadata', False))
         if args.save_full_image:
             full_path = output_path.with_stem(output_path.stem + "_full")
-            image.save(path=full_path)
+            image.save(path=full_path, embed_metadata=getattr(args, 'embed_metadata', False))
 
-    def optional_callbacks(flux, args):
+    def register_optional_callbacks(flux, args):
         # No extra callbacks needed beyond the built-in memory and stepwise handlers
         pass
 
     generator.save_image = save_image
-    generator.optional_callbacks = optional_callbacks
+    generator.register_optional_callbacks = register_optional_callbacks
 
     generator.run(
         args,
