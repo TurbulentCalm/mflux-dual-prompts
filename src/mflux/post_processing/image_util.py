@@ -254,6 +254,7 @@ class ImageUtil:
         path: str | Path,
         metadata: dict | None = None,
         export_json_metadata: bool = False,
+        embed_metadata: bool = False,
         overwrite: bool = False,
     ) -> None:
         file_path = Path(path)
@@ -270,48 +271,29 @@ class ImageUtil:
                 counter += 1
 
         try:
-            # Save image without metadata first
-            log.info(f"About to call image.save [DEBUG-TRACE] | image: {image}, type: {type(image)}, path: {file_path}")
-            image.save(file_path)
-            log.info(f"Image saved successfully at: {file_path}")
+            # If embedding EXIF metadata and saving as JPEG, do it in a single save operation
+            if embed_metadata and metadata is not None and file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                import piexif
+                import json
+                user_comment_bytes = json.dumps(metadata).encode("utf-8")
+                exif_dict = {"Exif": {piexif.ExifIFD.UserComment: user_comment_bytes}}
+                exif_bytes = piexif.dump(exif_dict)
+                image.save(file_path, format="JPEG", exif=exif_bytes)
+                log.info(f"Image saved with EXIF metadata at: {file_path}")
+            else:
+                # Save image without EXIF
+                image.save(file_path)
+                log.info(f"Image saved successfully at: {file_path}")
+                # If EXIF requested but not JPEG, log a warning
+                if embed_metadata and metadata is not None and file_path.suffix.lower() not in ['.jpg', '.jpeg']:
+                    log.warning("*** EXIF embedding only supported for JPEG files. Skipping EXIF embedding.")
 
             # Optionally save json metadata file
             if export_json_metadata:
                 with open(f"{file_path.with_suffix('.json')}", "w") as json_file:
                     json.dump(metadata, json_file, indent=4)
-
-            # Embed metadata
-            if metadata is not None:
-                ImageUtil._embed_metadata(metadata, file_path)
-                log.info(f"Metadata embedded successfully at: {file_path}")
         except Exception as e:  # noqa: BLE001
             log.error(f"Error saving image: {e} [DEBUG-TRACE]")
-
-    @staticmethod
-    def _embed_metadata(metadata: dict, path: str | Path) -> None:
-        try:
-            # Convert metadata dictionary to a string
-            metadata_str = json.dumps(metadata)
-
-            # Convert the string to bytes (using UTF-8 encoding)
-            user_comment_bytes = metadata_str.encode("utf-8")
-
-            # Define the UserComment tag ID
-            USER_COMMENT_TAG_ID = 0x9286
-
-            # Create a piexif-compatible dictionary structure
-            exif_piexif_dict = {"Exif": {USER_COMMENT_TAG_ID: user_comment_bytes}}
-
-            # Load the image and embed the EXIF data
-            image = PIL.Image.open(path)
-            exif_bytes = piexif.dump(exif_piexif_dict)
-            image.info["exif"] = exif_bytes
-
-            # Save the image with metadata
-            image.save(path, exif=exif_bytes)
-
-        except Exception as e:  # noqa: BLE001
-            log.error(f"Error embedding metadata: {e}")
 
     @staticmethod
     def preprocess_for_model(
