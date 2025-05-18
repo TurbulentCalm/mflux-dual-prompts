@@ -23,6 +23,9 @@ class CannyImageSaver(BeforeLoopCallback):
         depth_image: PIL.Image.Image | None = None,
         **kwargs,
     ) -> None:
+        if canny_image is None:
+            # *** Pre-loop or missing data: no canny image to save, skip saving to avoid errors
+            return
         clip_prompt = kwargs.get('clip_prompt', None)
         t5_prompt = kwargs.get('t5_prompt', None)
         dual_prompts = kwargs.get('dual_prompts', False)

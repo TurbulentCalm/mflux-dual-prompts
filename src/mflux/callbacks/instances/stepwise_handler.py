@@ -35,8 +35,9 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         depth_image: PIL.Image.Image | None = None,
         **kwargs,
     ) -> None:
+        step = getattr(config, 'init_time_step', 0)  # *** Defensive: default to 0 if not present; pre-loop image is just a placeholder (blank or noise is fine)
         self._save_image(
-            step=config.init_time_step,
+            step=step,
             seed=seed,
             prompt=prompt,
             latents=latents,
@@ -73,7 +74,8 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         time_steps: tqdm,
         **kwargs,
     ) -> None:
-        self._save_composite()
+        # *** Needs fixing no path argument
+        self._save_composite(seed)
 
     def _save_image(
         self,
@@ -84,6 +86,9 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         config: RuntimeConfig,
         time_steps: tqdm,
     ) -> None:
+        if latents is None:
+            # *** Pre-loop call: no latents to save, skip image generation (placeholder/blank image is fine)
+            return
         unpack_latents = ArrayUtil.unpack_latents(latents=latents, height=config.height, width=config.width)
         stepwise_decoded = self.flux.vae.decode(unpack_latents)
         generation_time = time_steps.format_dict["elapsed"] if time_steps is not None else 0
@@ -99,20 +104,24 @@ class StepwiseHandler(BeforeLoopCallback, InLoopCallback, InterruptCallback):
         )
         if self.stepwise_single_image:
             stepwise_img.save(
-                path=self.output_dir / "current_step.png",
+                path=self.output_dir / f"current_step.png",
                 export_json_metadata=False,
+                overwrite=True,
             )
-            self.stepwise_images.append(stepwise_img)
-            self._save_composite()
         else:
             stepwise_img.save(
                 path=self.output_dir / f"seed_{seed}_step{step}of{config.num_inference_steps}.png",
                 export_json_metadata=False,
+                overwrite=False,
             )
-            self.stepwise_images.append(stepwise_img)
-            self._save_composite()
+        self.stepwise_images.append(stepwise_img)
+        self._save_composite(seed)
 
-    def _save_composite(self) -> None:
+    def _save_composite(self, seed: int) -> None:
         if self.stepwise_images:
-            composite_img = ImageUtil.to_composite_image(self.stepwise_images)
-            composite_img.save(self.output_dir / ("composite.png" if self.stepwise_single_image else "composite.png"))
+            if self.stepwise_single_image:
+                composite_img = ImageUtil.to_composite_image(self.stepwise_images)
+                composite_img.save(self.output_dir / f"composite.png")
+            else:
+                composite_img = ImageUtil.to_composite_image(self.stepwise_images)
+                composite_img.save(self.output_dir / f"seed_{seed}_composite.png")
