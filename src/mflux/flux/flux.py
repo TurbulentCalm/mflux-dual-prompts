@@ -36,6 +36,7 @@ class Flux1(nn.Module):
         lora_scales: list[float] | None = None,
     ):
         super().__init__()
+        self.prompt_cache = {}  # TODO: Add a method to clear the prompt cache for more flexible cache management
         FluxInitializer.init(
             flux_model=self,
             model_config=model_config,

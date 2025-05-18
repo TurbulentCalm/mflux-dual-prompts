@@ -25,7 +25,7 @@ class ImageGenerator:
     ):
         # Override this method in generate_*.py for custom saving
         output_path = Path(args.output.format(seed=seed))
-        image.save(path=output_path, export_json_metadata=args.metadata)
+        image.save(path=output_path, export_json_metadata=args.metadata, embed_metadata=getattr(args, 'embed_metadata', False))
 
     def register_optional_callbacks(
         self,

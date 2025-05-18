@@ -98,10 +98,10 @@ class GeneratedImage:
         self,
         path: str | Path,
         export_json_metadata: bool = False,
+        embed_metadata: bool = False,
         overwrite: bool = False,
     ) -> None:
-
-        ImageUtil.save_image(self.image, path, self._get_metadata(), export_json_metadata, overwrite)
+        ImageUtil.save_image(self.image, path, self._get_metadata(), export_json_metadata, embed_metadata, overwrite)
 
     def _get_metadata(self) -> dict:
         """Generate metadata for reference as well as input data for
