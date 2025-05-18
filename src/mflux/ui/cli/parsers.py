@@ -111,9 +111,11 @@ class CommandLineParser(argparse.ArgumentParser):
 
     def add_output_arguments(self) -> None:
         self.add_argument("--metadata", action="store_true", help="Export image metadata as a JSON file.")
+        self.add_argument("--embed-metadata", action="store_true", help="Embed metadata into the image file as EXIF.")
+        self.add_argument("--overwrite-image", action="store_true", help="Overwrite output image files if they already exist.")
         self.add_argument("--output", type=str, default="image.png", help="The filename for the output image. Default is \"image.png\".")
-        self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write stepwise images and their final composite image to. This feature may change in future versions.')
-        self.add_argument('--stepwise-single-image', action='store_true', help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, creates a single image file that is updated at each step instead of separate files for each step.')
+        self.add_argument('--stepwise-image-output-dir', type=str, default=None, help='[EXPERIMENTAL] Output dir to write step-wise images and their final composite image to. This feature may change in future versions.')
+        self.add_argument('--stepwise-single-image', action='store_true', help='[EXPERIMENTAL] When used with --stepwise-image-output-dir, only keep the most recent step image as current_step.png.')
 
     def add_image_outpaint_arguments(self, required=False) -> None:
         self.supports_image_outpaint = True
@@ -224,24 +226,6 @@ class CommandLineParser(argparse.ArgumentParser):
             # e.g. output.png -> output_seed_101.png output_seed_102.png, etc
             output_path = Path(namespace.output)
             namespace.output = str(output_path.with_stem(output_path.stem + "_seed_{seed}"))
-
-        # # Dual prompt validation
-        # if getattr(namespace, "dual_prompts", False):
-        #     print("*** dual prompts")
-        #     # Accept None, empty string, or whitespace as 'not provided'
-        #     clip_val = (namespace.clip_prompt or "").strip()
-        #     t5_val = (namespace.t5_prompt or "").strip()
-        #     print(f"*** clip-prompt: {clip_val}")
-        #     print(f"*** t5-prompt: {t5_val}")
-        #     # if not (clip_val or t5_val):
-        #         # self.error("In dual prompts mode, at least one of --clip-prompt or --t5-prompt must be provided (non-empty). You may leave one blank, but not both.")
-        # else:
-        #     print("*** combined prompt")
-        #     print(f"*** prompt: {prompt_val}")
-        #     prompt_val = (namespace.prompt or "").strip()
-        #     print(f"*** prompt: {prompt_val}")
-        #     if not getattr(namespace, "prompt", None):
-        #         self.error("--prompt argument required or 'prompt' required in metadata config file (or use dual prompts mode with --clip-prompt/--clip_prompt and --t5-prompt/--t5_prompt)")
 
         if self.supports_image_generation and namespace.steps is None:
             namespace.steps = ui_defaults.MODEL_INFERENCE_STEPS.get(namespace.model, 14)

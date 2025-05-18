@@ -26,7 +26,7 @@ def main():
 
     def save_image(image, seed, args):
         output_path = Path(args.output.format(seed=seed))
-        image.save(path=output_path, embed_metadata=getattr(args, 'embed_metadata', False))
+        image.save(path=output_path, embed_metadata=getattr(args, 'embed_metadata', False), overwrite=getattr(args, 'overwrite_image', False))
 
     def register_optional_callbacks(flux, args):
         # No additional callbacks needed for fill tasks at this time.

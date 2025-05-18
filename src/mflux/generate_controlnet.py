@@ -23,7 +23,7 @@ def main():
 
     def save_image(image, seed, args):
         output_path = Path(args.output.format(seed=seed))
-        image.save(path=output_path, embed_metadata=getattr(args, 'embed_metadata', False))
+        image.save(path=output_path, embed_metadata=getattr(args, 'embed_metadata', False), overwrite=getattr(args, 'overwrite_image', False))
 
     def register_optional_callbacks(flux, args):
         # If enabled, CannyImageSaver will save the canny image using the new callback system.
