@@ -9,7 +9,7 @@ class TokenizerCLIP:
         self.tokenizer = tokenizer
 
     def tokenize(self, prompt: str) -> mx.array:
-        return self.tokenizer(
+        tokens = self.tokenizer(
             [prompt],
             padding="max_length",
             max_length=TokenizerCLIP.MAX_TOKEN_LENGTH,
@@ -18,3 +18,4 @@ class TokenizerCLIP:
             return_overflowing_tokens=False,
             return_tensors="mlx",
         ).input_ids
+        return tokens

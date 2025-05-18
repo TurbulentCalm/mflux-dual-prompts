@@ -8,7 +8,7 @@ class TokenizerT5:
         self.max_length = max_length
 
     def tokenize(self, prompt: str) -> mx.array:
-        return self.tokenizer(
+        tokens = self.tokenizer(
             [prompt],
             padding="max_length",
             max_length=self.max_length,
@@ -17,3 +17,4 @@ class TokenizerT5:
             return_overflowing_tokens=False,
             return_tensors="mlx",
         ).input_ids
+        return tokens

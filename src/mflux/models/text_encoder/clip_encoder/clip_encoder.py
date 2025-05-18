@@ -1,5 +1,6 @@
 import mlx.core as mx
 from mlx import nn
+import numpy as np
 
 from mflux.models.text_encoder.clip_encoder.clip_text_model import CLIPTextModel
 
